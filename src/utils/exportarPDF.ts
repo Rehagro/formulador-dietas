@@ -32,16 +32,6 @@ function statusTexto(s: string): string {
   }
 }
 
-function statusCor(s: string): [number, number, number] {
-  switch (s) {
-    case 'ok':            return COR_OK;
-    case 'baixo':         return COR_ALERTA;
-    case 'alto':          return COR_ALERTA;
-    case 'critico_baixo': return COR_CRITICO;
-    case 'critico_alto':  return COR_CRITICO;
-    default:              return COR_CALC;
-  }
-}
 
 /** Título de seção com faixa colorida */
 function sectionTitle(doc: jsPDF, y: number, texto: string): number {
