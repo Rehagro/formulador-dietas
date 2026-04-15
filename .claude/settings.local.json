@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm run:*)",
+      "Read(//c/Users/rasaf/rehagro-cs-engajamento/**)",
+      "Bash(cat .gitignore)",
+      "Bash(python -c ':*)",
+      "Bash(npx tsc:*)",
+      "Bash(echo \"EXIT:$?\")",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(python3:*)",
+      "Bash(npx vite *)",
+      "Bash(git *)"
+    ]
+  }
+}
