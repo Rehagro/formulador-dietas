@@ -1,4 +1,5 @@
 export interface Alimento {
+  id?: string;
   nome: string;
   custo: number | null;
   classificacao: string;

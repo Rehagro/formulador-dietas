@@ -18,10 +18,10 @@ export default function Formulador() {
     [dieta.slots, dieta.animal, alimentos]
   );
 
-  function handleSalvar() {
+  async function handleSalvar() {
     setSalvando(true);
-    salvarDieta(nomeDieta);
-    setTimeout(() => setSalvando(false), 800);
+    await salvarDieta(nomeDieta);
+    setSalvando(false);
   }
 
   function handleExportar() {

@@ -42,8 +42,8 @@ const ALIMENTO_VAZIO: Alimento = {
   lisina_pct: null, met_pct: null,
 };
 
-function Campo({ label, field, valor, onChange, tipo = 'number', opcoes }: {
-  label: string; field: string; valor: unknown;
+function Campo({ label, valor, onChange, tipo = 'number', opcoes }: {
+  label: string; valor: unknown;
   onChange: (v: unknown) => void; tipo?: string; opcoes?: string[];
 }) {
   if (tipo === 'select' && opcoes) {
@@ -127,7 +127,7 @@ function FormAlimento({ inicial, onSalvar, onCancelar }: {
         </div>
         <div className="p-4 grid grid-cols-2 md:grid-cols-3 gap-3 max-h-[60vh] overflow-y-auto">
           {campos.map(c => (
-            <Campo key={c.key} label={c.label} field={c.key} valor={form[c.key]}
+            <Campo key={c.key} label={c.label} valor={form[c.key]}
               onChange={set(c.key)} tipo={c.tipo} opcoes={c.opcoes} />
           ))}
         </div>
@@ -162,29 +162,6 @@ const W_ACTIONS = 72;   // px
 const H_GRUPO = 26; // px
 
 const stickyNomeTh = `sticky left-0 z-40 bg-gray-50 w-[${W_NOME}px] min-w-[${W_NOME}px]`;
-const stickyTipoTh = `sticky left-[${W_NOME}px] z-40 bg-gray-50 w-[${W_TIPO}px] min-w-[${W_TIPO}px]`;
-const stickyNomeTd = `sticky left-0 z-10 bg-white w-[${W_NOME}px] min-w-[${W_NOME}px]`;
-const stickyTipoTd = `sticky left-[${W_NOME}px] z-10 bg-white w-[${W_TIPO}px] min-w-[${W_TIPO}px]`;
-
-function GrupoTh({ label, cols, sticky, stickyClass }: {
-  label: string; cols: number; sticky?: boolean; stickyClass?: string;
-}) {
-  return (
-    <th colSpan={cols}
-      style={sticky ? undefined : undefined}
-      className={`text-center px-2 py-1 text-[10px] font-bold text-gray-500 uppercase tracking-wider bg-gray-100 border-x border-gray-200 sticky top-0 z-30 ${stickyClass ?? ''}`}>
-      {label}
-    </th>
-  );
-}
-
-function Th({ children, top }: { children: React.ReactNode; top: number }) {
-  return (
-    <th style={{ top }} className="text-right px-2 py-2 text-xs font-semibold text-gray-600 whitespace-nowrap border-x border-gray-100 sticky z-20 bg-gray-50">
-      {children}
-    </th>
-  );
-}
 
 function Td({ children, align = 'right' }: { children: React.ReactNode; align?: 'left' | 'right' | 'center' }) {
   return (
@@ -217,9 +194,9 @@ export default function Alimentos() {
       {(editando || novo) && (
         <FormAlimento
           inicial={editando ?? ALIMENTO_VAZIO}
-          onSalvar={a => {
-            if (editando) editarAlimento(editando.nome, a);
-            else adicionarAlimento(a);
+          onSalvar={async a => {
+            if (editando) await editarAlimento(editando.nome, a);
+            else await adicionarAlimento(a);
             setEditando(null); setNovo(false);
           }}
           onCancelar={() => { setEditando(null); setNovo(false); }}
@@ -347,7 +324,7 @@ export default function Alimentos() {
                           className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors" title="Editar">
                           <Pencil size={13} />
                         </button>
-                        <button onClick={() => { if (confirm(`Excluir "${a.nome}"?`)) excluirAlimento(a.nome); }}
+                        <button onClick={() => { if (confirm(`Excluir "${a.nome}"?`)) excluirAlimento(a.nome).catch(console.error); }}
                           className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors" title="Excluir">
                           <Trash2 size={13} />
                         </button>

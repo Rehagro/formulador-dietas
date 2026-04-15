@@ -1,10 +1,14 @@
 import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react';
+import type { User } from '@supabase/supabase-js';
 import type { Dieta, Alimento, SlotIngrediente, AnimalLactacao } from '../types';
 import alimentosBase from '../data/alimentos.json';
 import {
-  getDietas, saveDietas, getDietaAtiva, setDietaAtiva,
-  getAlimentosCustom, saveAlimentosCustom, gerarId
-} from '../utils/storage';
+  supabase,
+  getDietasSupabase, saveDietaSupabase, deleteDietaSupabase,
+  getAlimentosCustomSupabase, saveAlimentoCustomSupabase, deleteAlimentoCustomSupabase,
+  signOut,
+} from '../lib/supabase';
+import { gerarId } from '../utils/storage';
 
 const ANIMAL_PADRAO: AnimalLactacao = {
   ecc: 3.0,
@@ -28,68 +32,90 @@ function criarSlots(): SlotIngrediente[] {
   }));
 }
 
-/** Remove slots vazios no final, mantendo no mínimo SLOTS_PADRAO */
 function normalizarSlots(slots: SlotIngrediente[]): SlotIngrediente[] {
   const preenchidos = slots.filter(s => s.alimentoNome !== null || s.kgMN > 0);
   const minTotal = Math.max(preenchidos.length + 1, SLOTS_PADRAO);
   if (slots.length <= minTotal) return slots;
-  // Corta o excesso de slots vazios no final
-  const trimmed = slots.slice(0, minTotal);
-  return trimmed;
+  return slots.slice(0, minTotal);
+}
+
+function dietaNova(): Dieta {
+  return {
+    id: gerarId(),
+    nome: 'Nova Dieta',
+    criadaEm: new Date().toISOString(),
+    animal: ANIMAL_PADRAO,
+    slots: criarSlots(),
+  };
 }
 
 interface DietaContextType {
   dieta: Dieta;
   alimentos: Alimento[];
   dietas: Dieta[];
+  carregando: boolean;
+  usuario: User | null;
+  logout: () => Promise<void>;
   setAnimal: (animal: AnimalLactacao) => void;
   setSlot: (idx: number, slot: Partial<SlotIngrediente>) => void;
-  salvarDieta: (nome: string) => void;
+  salvarDieta: (nome: string) => Promise<void>;
   carregarDieta: (id: string) => void;
   novaDieta: () => void;
   duplicarDieta: (id: string) => void;
-  excluirDieta: (id: string) => void;
-  renomearDieta: (id: string, nome: string) => void;
+  excluirDieta: (id: string) => Promise<void>;
+  renomearDieta: (id: string, nome: string) => Promise<void>;
   adicionarSlot: () => void;
   reordenarSlots: (de: number, para: number) => void;
-  adicionarAlimento: (a: Alimento) => void;
-  editarAlimento: (nomeOriginal: string, a: Alimento) => void;
-  excluirAlimento: (nome: string) => void;
+  adicionarAlimento: (a: Alimento) => Promise<void>;
+  editarAlimento: (nomeOriginal: string, a: Alimento) => Promise<void>;
+  excluirAlimento: (nome: string) => Promise<void>;
 }
 
 const DietaContext = createContext<DietaContextType | null>(null);
 
 export function DietaProvider({ children }: { children: ReactNode }) {
-  const [alimentos, setAlimentos] = useState<Alimento[]>(() => {
-    const custom = getAlimentosCustom();
-    const base = alimentosBase as Alimento[];
-    // custom overrides base por nome
-    const customNomes = new Set(custom.map(a => a.nome));
-    return [...base.filter(a => !customNomes.has(a.nome)), ...custom].sort((a, b) =>
-      a.nome.localeCompare(b.nome, 'pt-BR')
-    );
-  });
+  const [usuario, setUsuario] = useState<User | null>(null);
+  const [carregando, setCarregando] = useState(true);
+  const [alimentos, setAlimentos] = useState<Alimento[]>(alimentosBase as Alimento[]);
+  const [dietas, setDietas] = useState<Dieta[]>([]);
+  const [dieta, setDieta] = useState<Dieta>(dietaNova);
 
-  const [dietas, setDietas] = useState<Dieta[]>(() => getDietas());
-
-  const [dieta, setDieta] = useState<Dieta>(() => {
-    const ativaId = getDietaAtiva();
-    if (ativaId) {
-      const salva = getDietas().find(d => d.id === ativaId);
-      if (salva) return { ...salva, slots: normalizarSlots(salva.slots) };
-    }
-    return {
-      id: gerarId(),
-      nome: 'Nova Dieta',
-      criadaEm: new Date().toISOString(),
-      animal: ANIMAL_PADRAO,
-      slots: criarSlots(),
-    };
-  });
-
+  // Carrega dados do Supabase na inicialização
   useEffect(() => {
-    setDietaAtiva(dieta.id);
-  }, [dieta.id]);
+    async function inicializar() {
+      setCarregando(true);
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        setUsuario(user);
+
+        const [dietasDB, customDB] = await Promise.all([
+          getDietasSupabase(),
+          getAlimentosCustomSupabase(),
+        ]);
+
+        // Mescla alimentos base + custom (custom sobrescreve base por nome)
+        const base = alimentosBase as Alimento[];
+        const customNomes = new Set(customDB.map(a => a.nome));
+        const merged = [...base.filter(a => !customNomes.has(a.nome)), ...customDB]
+          .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+        setAlimentos(merged);
+
+        setDietas(dietasDB);
+        if (dietasDB.length > 0) {
+          setDieta({ ...dietasDB[0], slots: normalizarSlots(dietasDB[0].slots) });
+        }
+      } catch (err) {
+        console.error('Erro ao inicializar dados:', err);
+      } finally {
+        setCarregando(false);
+      }
+    }
+    inicializar();
+  }, []);
+
+  const logout = useCallback(async () => {
+    await signOut();
+  }, []);
 
   const setAnimal = useCallback((animal: AnimalLactacao) => {
     setDieta(d => ({ ...d, animal }));
@@ -103,13 +129,12 @@ export function DietaProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
-  const salvarDieta = useCallback((nome: string) => {
+  const salvarDieta = useCallback(async (nome: string) => {
     setDieta(d => {
       const atualizada = { ...d, nome };
       setDietas(prev => {
-        const semAtual = prev.filter(x => x.id !== atualizada.id);
-        const nova = [atualizada, ...semAtual];
-        saveDietas(nova);
+        const nova = [atualizada, ...prev.filter(x => x.id !== atualizada.id)];
+        saveDietaSupabase(atualizada).catch(console.error);
         return nova;
       });
       return atualizada;
@@ -117,50 +142,45 @@ export function DietaProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const carregarDieta = useCallback((id: string) => {
-    const d = getDietas().find(x => x.id === id);
-    if (d) setDieta({ ...d, slots: normalizarSlots(d.slots) });
+    setDietas(prev => {
+      const d = prev.find(x => x.id === id);
+      if (d) setDieta({ ...d, slots: normalizarSlots(d.slots) });
+      return prev;
+    });
   }, []);
 
   const novaDieta = useCallback(() => {
-    setDieta({
-      id: gerarId(),
-      nome: 'Nova Dieta',
-      criadaEm: new Date().toISOString(),
-      animal: ANIMAL_PADRAO,
-      slots: criarSlots(),
-    });
+    setDieta(dietaNova());
   }, []);
 
   const duplicarDieta = useCallback((id: string) => {
-    const orig = getDietas().find(x => x.id === id);
-    if (!orig) return;
-    const copia: Dieta = {
-      ...orig,
-      id: gerarId(),
-      nome: `Cópia de ${orig.nome}`,
-      criadaEm: new Date().toISOString(),
-      slots: orig.slots.map(s => ({ ...s, id: gerarId() })),
-    };
     setDietas(prev => {
+      const orig = prev.find(x => x.id === id);
+      if (!orig) return prev;
+      const copia: Dieta = {
+        ...orig,
+        id: gerarId(),
+        nome: `Cópia de ${orig.nome}`,
+        criadaEm: new Date().toISOString(),
+        slots: orig.slots.map(s => ({ ...s, id: gerarId() })),
+      };
       const nova = [copia, ...prev];
-      saveDietas(nova);
-      return nova;
-    });
-    setDieta(copia);
-  }, []);
-
-  const excluirDieta = useCallback((id: string) => {
-    setDietas(prev => {
-      const nova = prev.filter(x => x.id !== id);
-      saveDietas(nova);
+      saveDietaSupabase(copia).catch(console.error);
+      setDieta(copia);
       return nova;
     });
   }, []);
 
-  const renomearDieta = useCallback((id: string, nome: string) => {
+  const excluirDieta = useCallback(async (id: string) => {
+    await deleteDietaSupabase(id);
+    setDietas(prev => prev.filter(x => x.id !== id));
+  }, []);
+
+  const renomearDieta = useCallback(async (id: string, nome: string) => {
     setDietas(prev => {
       const nova = prev.map(d => d.id === id ? { ...d, nome } : d);
-      saveDietas(nova);
+      const dietaAtualizada = nova.find(d => d.id === id);
+      if (dietaAtualizada) saveDietaSupabase(dietaAtualizada).catch(console.error);
       return nova;
     });
     setDieta(d => d.id === id ? { ...d, nome } : d);
@@ -182,41 +202,41 @@ export function DietaProvider({ children }: { children: ReactNode }) {
     }));
   }, []);
 
-  const adicionarAlimento = useCallback((a: Alimento) => {
+  const adicionarAlimento = useCallback(async (a: Alimento) => {
+    const id = await saveAlimentoCustomSupabase(a);
+    const comId = { ...a, id };
     setAlimentos(prev => {
-      const novo = [...prev.filter(x => x.nome !== a.nome), a].sort((x, y) =>
-        x.nome.localeCompare(y.nome, 'pt-BR')
-      );
-      saveAlimentosCustom(novo.filter(x => !(alimentosBase as Alimento[]).some(b => b.nome === x.nome)));
-      return novo;
+      const base = alimentosBase as Alimento[];
+      const isBase = base.some(b => b.nome === comId.nome);
+      if (isBase) return prev; // alimentos base não sobrescrevem via custom
+      return [...prev.filter(x => x.nome !== comId.nome), comId]
+        .sort((x, y) => x.nome.localeCompare(y.nome, 'pt-BR'));
     });
   }, []);
 
-  const editarAlimento = useCallback((nomeOriginal: string, a: Alimento) => {
-    setAlimentos(prev => {
-      const novo = prev.map(x => x.nome === nomeOriginal ? a : x).sort((x, y) =>
-        x.nome.localeCompare(y.nome, 'pt-BR')
-      );
-      saveAlimentosCustom(novo.filter(x => !(alimentosBase as Alimento[]).some(b => b.nome === x.nome)));
-      return novo;
-    });
+  const editarAlimento = useCallback(async (nomeOriginal: string, a: Alimento) => {
+    const id = await saveAlimentoCustomSupabase(a);
+    const comId = { ...a, id };
+    setAlimentos(prev =>
+      prev.map(x => x.nome === nomeOriginal ? comId : x)
+        .sort((x, y) => x.nome.localeCompare(y.nome, 'pt-BR'))
+    );
   }, []);
 
-  const excluirAlimento = useCallback((nome: string) => {
-    setAlimentos(prev => {
-      const novo = prev.filter(x => x.nome !== nome);
-      saveAlimentosCustom(novo.filter(x => !(alimentosBase as Alimento[]).some(b => b.nome === x.nome)));
-      return novo;
-    });
-  }, []);
+  const excluirAlimento = useCallback(async (nome: string) => {
+    const alimentoCustom = alimentos.find(x => x.nome === nome && x.id);
+    if (alimentoCustom?.id) {
+      await deleteAlimentoCustomSupabase(alimentoCustom.id);
+    }
+    setAlimentos(prev => prev.filter(x => x.nome !== nome));
+  }, [alimentos]);
 
   return (
     <DietaContext.Provider value={{
-      dieta, alimentos, dietas,
+      dieta, alimentos, dietas, carregando, usuario, logout,
       setAnimal, setSlot,
       salvarDieta, carregarDieta, novaDieta, duplicarDieta, excluirDieta, renomearDieta,
-      adicionarSlot,
-      reordenarSlots,
+      adicionarSlot, reordenarSlots,
       adicionarAlimento, editarAlimento, excluirAlimento,
     }}>
       {children}

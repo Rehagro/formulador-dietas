@@ -95,13 +95,13 @@ export default function Dietas() {
                         value={novoNome}
                         onChange={e => setNovoNome(e.target.value)}
                         onKeyDown={e => {
-                          if (e.key === 'Enter') { renomearDieta(d.id, novoNome); setEditandoNome(null); }
+                          if (e.key === 'Enter') { renomearDieta(d.id, novoNome).then(() => setEditandoNome(null)); }
                           if (e.key === 'Escape') setEditandoNome(null);
                         }}
                         className="border border-gray-300 rounded px-2 py-1 text-sm flex-1 focus:outline-none focus:ring-1 focus:ring-green-500"
                       />
                       <button
-                        onClick={() => { renomearDieta(d.id, novoNome); setEditandoNome(null); }}
+                        onClick={() => renomearDieta(d.id, novoNome).then(() => setEditandoNome(null))}
                         className="px-3 py-1 bg-green-600 text-white text-sm rounded hover:bg-green-700"
                       >OK</button>
                     </div>
@@ -157,7 +157,7 @@ export default function Dietas() {
                   </button>
                   <button
                     onClick={() => {
-                      if (confirm(`Excluir "${d.nome}"?`)) excluirDieta(d.id);
+                      if (confirm(`Excluir "${d.nome}"?`)) excluirDieta(d.id).catch(console.error);
                     }}
                     title="Excluir"
                     className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
