@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Copy, Trash2, Pencil, Download, FlaskConical, BarChart2 } from 'lucide-react';
+import { Copy, Trash2, Pencil, Download, FlaskConical, BarChart2, FileText } from 'lucide-react';
 import { useDieta } from '../context/DietaContext';
 import { calcularResultados } from '../utils/calculos';
 import { exportarXLSX } from '../utils/exportar';
+import { exportarPDF } from '../utils/exportarPDF';
 
 export default function Dietas() {
   const { dietas, dieta: dietaAtiva, alimentos, carregarDieta, duplicarDieta, excluirDieta, renomearDieta } = useDieta();
@@ -147,6 +148,13 @@ export default function Dietas() {
                     className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
                   >
                     <Download size={14} />
+                  </button>
+                  <button
+                    onClick={() => exportarPDF(d, alimentos)}
+                    title="Exportar PDF"
+                    className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                  >
+                    <FileText size={14} />
                   </button>
                   <button
                     onClick={() => { carregarDieta(d.id); navigate('/'); }}

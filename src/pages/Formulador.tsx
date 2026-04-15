@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Save, Download, RefreshCw } from 'lucide-react';
+import { Save, Download, RefreshCw, FileText } from 'lucide-react';
 import { useDieta } from '../context/DietaContext';
 import PainelAnimal from '../components/PainelAnimal';
 import PainelResultados from '../components/PainelResultados';
@@ -7,6 +7,7 @@ import TabelaIngredientes from '../components/TabelaIngredientes';
 import Indicadores from '../components/Indicadores';
 import { calcularResultados } from '../utils/calculos';
 import { exportarXLSX } from '../utils/exportar';
+import { exportarPDF } from '../utils/exportarPDF';
 
 export default function Formulador() {
   const { dieta, alimentos, setAnimal, setSlot, salvarDieta, novaDieta, adicionarSlot, reordenarSlots } = useDieta();
@@ -32,6 +33,10 @@ export default function Formulador() {
 
   function handleExportar() {
     exportarXLSX({ ...dieta, nome: nomeDieta }, alimentos);
+  }
+
+  function handleExportarPDF() {
+    exportarPDF({ ...dieta, nome: nomeDieta }, alimentos);
   }
 
   return (
@@ -70,7 +75,14 @@ export default function Formulador() {
           className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
         >
           <Download size={15} />
-          Exportar XLSX
+          XLSX
+        </button>
+        <button
+          onClick={handleExportarPDF}
+          className="flex items-center gap-1.5 px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 transition-colors"
+        >
+          <FileText size={15} />
+          PDF
         </button>
         <button
           onClick={() => { novaDieta(); setNomeDieta('Nova Dieta'); }}
