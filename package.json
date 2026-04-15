@@ -10,6 +10,9 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.103.2",
+    "@types/file-saver": "^2.0.7",
+    "exceljs": "^4.4.0",
+    "file-saver": "^2.0.5",
     "jspdf": "^4.2.1",
     "jspdf-autotable": "^5.0.7",
     "lucide-react": "^0.475.0",

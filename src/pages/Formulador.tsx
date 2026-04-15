@@ -32,7 +32,7 @@ export default function Formulador() {
   }
 
   function handleExportar() {
-    exportarXLSX({ ...dieta, nome: nomeDieta }, alimentos);
+    exportarXLSX({ ...dieta, nome: nomeDieta }, alimentos).catch(console.error);
   }
 
   function handleExportarPDF() {

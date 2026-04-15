@@ -143,7 +143,7 @@ export default function Dietas() {
                     <Copy size={14} />
                   </button>
                   <button
-                    onClick={() => exportarXLSX(d, alimentos)}
+                    onClick={() => exportarXLSX(d, alimentos).catch(console.error)}
                     title="Exportar XLSX"
                     className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
                   >
