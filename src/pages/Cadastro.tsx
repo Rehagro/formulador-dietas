@@ -30,12 +30,12 @@ export default function Cadastro() {
       if (error) {
         setErro(error.message === 'User already registered'
           ? 'E-mail já cadastrado. Faça login.'
-          : 'Erro ao criar conta. Tente novamente.');
+          : error.message);
       } else {
         navigate('/');
       }
-    } catch {
-      setErro('Erro ao conectar. Tente novamente.');
+    } catch (e) {
+      setErro('Erro ao conectar: ' + String(e));
     } finally {
       setCarregando(false);
     }

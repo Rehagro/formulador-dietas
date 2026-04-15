@@ -130,16 +130,11 @@ export function DietaProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const salvarDieta = useCallback(async (nome: string) => {
-    setDieta(d => {
-      const atualizada = { ...d, nome };
-      setDietas(prev => {
-        const nova = [atualizada, ...prev.filter(x => x.id !== atualizada.id)];
-        saveDietaSupabase(atualizada).catch(console.error);
-        return nova;
-      });
-      return atualizada;
-    });
-  }, []);
+    const atualizada = { ...dieta, nome };
+    setDieta(atualizada);
+    setDietas(prev => [atualizada, ...prev.filter(x => x.id !== atualizada.id)]);
+    await saveDietaSupabase(atualizada);
+  }, [dieta]);
 
   const carregarDieta = useCallback((id: string) => {
     setDietas(prev => {
