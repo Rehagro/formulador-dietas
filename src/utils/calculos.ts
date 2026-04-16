@@ -1,15 +1,36 @@
 import type { Alimento, AnimalLactacao, SlotIngrediente, ResultadoDieta } from '../types';
 
-export function calcularCMSExigida(animal: AnimalLactacao): number {
+export function calcularCMSExigida(animal: AnimalLactacao, fdnDieta = 0): number {
+  // NRC 2021 — Eq. 4-1 (base) + limitante físico de FDN + ajuste pré-pico
   const { ecc, paridade, peso, del, leite, gordura, proteina, lactose } = animal;
-  const cms = (
+
+  // NEL/kg leite (NRC 2021 Eq. 3-14): coeficiente proteína = 0,0563
+  const nel_leite = 0.0929 * gordura + 0.0563 * proteina + 0.0395 * lactose;
+
+  // CMS base (NRC 2021 Eq. 4-1) — mesma estrutura NRC 2001 com coeficiente nel corrigido
+  const cms_base = (
     3.7 +
     (paridade * 5.7) +
-    (0.305 * ((0.0929 * gordura) + (0.0547 * proteina) + (0.0395 * lactose)) * leite) +
+    (0.305 * nel_leite * leite) +
     (0.022 * peso) +
     ((-0.689 - 1.87 * paridade) * ecc)
   ) * (1 - (0.212 + paridade * 0.136) * Math.exp(-0.053 * del));
-  return Math.max(0, cms);
+
+  // Limitante físico de FDN (NRC 2021): divide pelo fator FDN
+  // fdnDieta é fração decimal (ex: 0,38 para 38% FDN)
+  const fdn_fracao = fdnDieta > 0 ? fdnDieta : 0;
+  const cms_fdn = fdn_fracao > 0 ? cms_base / (1 - 0.63 * fdn_fracao) : cms_base;
+
+  // Ajuste pré-pico (NRC 2021): DEL ≤ 21 dias — ramp-up linear
+  let cms_final = cms_fdn;
+  if (del <= 21 && del > 0) {
+    cms_final = (0.52 + 0.024 * del) * cms_fdn;
+  }
+
+  // Teto biológico: máx 5% do PV
+  cms_final = Math.min(cms_final, peso * 0.05);
+
+  return Math.max(0, cms_final);
 }
 
 export function calcularNelAlimento(a: Alimento): number {
@@ -89,7 +110,19 @@ export function calcularResultados(
   alimentos: Alimento[],
   animal: AnimalLactacao
 ): ResultadoDieta {
-  const cmsExigida = calcularCMSExigida(animal);
+  // Pré-cálculo de FDN da dieta para usar no limitante físico do CMS (NRC 2021)
+  let _preMS = 0, _preFDN = 0;
+  for (const slot of slots) {
+    if (!slot.alimentoNome || slot.kgMN <= 0) continue;
+    const a = alimentos.find(x => x.nome === slot.alimentoNome);
+    if (!a) continue;
+    const kgMS = slot.kgMN * a.ms;
+    _preMS += kgMS;
+    _preFDN += (a.fdn ?? 0) * kgMS;
+  }
+  const fdnDieta = _preMS > 0 ? _preFDN / _preMS : 0;
+
+  const cmsExigida = calcularCMSExigida(animal, fdnDieta);
   const { kPf, kPc, kPl } = calcularTaxasPassagem(slots, alimentos, animal);
 
   let totalKgMN = 0;

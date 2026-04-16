@@ -143,7 +143,7 @@ export default function PainelResultados({ resultado, leite }: Props) {
         <div className="text-xs font-bold text-blue-700 mb-2 flex items-center">
           🥛 Consumo
           <InfoTooltip texto={
-            "CMS exigida — NRC 2001\n\nEquação de predição de consumo voluntário para vacas em lactação:\n\nCMS = [3,7 + (5,7 × paridade) + (0,305 × NEL_leite × leite) + (0,022 × PV) + ((-0,689 − 1,87 × paridade) × ECC)] × [1 − (0,212 + 0,136 × paridade) × e^(−0,053 × DEL)]\n\nOnde:\n• Paridade: 0 = novilha, 1 = vaca adulta\n• NEL_leite = 0,0929×gord% + 0,0547×prot% + 0,0395×lact%\n• PV = peso vivo (kg)\n• ECC = escore de condição corporal (1–5)\n• DEL = dias em lactação"
+            "CMS exigida — NRC 2021\n\nEquação base (Eq. 4-1):\nCMS_base = [3,7 + (5,7×paridade) + (0,305×NEL_leite×leite) + (0,022×PV) + ((-0,689 − 1,87×paridade)×ECC)] × [1 − (0,212 + 0,136×paridade) × e^(−0,053×DEL)]\n\nLimitante físico de FDN:\nCMS_FDN = CMS_base ÷ (1 − 0,63 × FDN_dieta)\n\nAjuste pré-pico (DEL ≤ 21 dias):\nCMS = (0,52 + 0,024 × DEL) × CMS_FDN\n\nTeto biológico: máx 5% do PV\n\nOnde:\n• Paridade: 0 = novilha, 1 = vaca adulta\n• NEL_leite = 0,0929×gord% + 0,0563×prot% + 0,0395×lact%\n• PV = peso vivo (kg)\n• ECC = escore de condição corporal (1–5)\n• DEL = dias em lactação\n• FDN_dieta = proporção de FDN na MS da dieta"
           } />
         </div>
         <div className="flex justify-between text-sm text-blue-700 mb-1 font-medium">

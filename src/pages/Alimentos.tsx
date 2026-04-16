@@ -46,6 +46,9 @@ function Campo({ label, valor, onChange, tipo = 'number', opcoes }: {
   label: string; valor: unknown;
   onChange: (v: unknown) => void; tipo?: string; opcoes?: string[];
 }) {
+  // For numeric fields, keep a local string state so commas/trailing dots aren't lost
+  const [localStr, setLocalStr] = useState<string | null>(null);
+
   if (tipo === 'select' && opcoes) {
     return (
       <div className="flex flex-col gap-0.5">
@@ -57,16 +60,46 @@ function Campo({ label, valor, onChange, tipo = 'number', opcoes }: {
       </div>
     );
   }
+
+  if (tipo === 'number') {
+    // Display: if user is mid-typing use localStr, otherwise show the numeric value
+    const displayValue = localStr !== null
+      ? localStr
+      : (valor === null || valor === undefined ? '' : String(valor));
+
+    return (
+      <div className="flex flex-col gap-0.5">
+        <label className="text-xs text-gray-500">{label}</label>
+        <input
+          type="text"
+          inputMode="decimal"
+          value={displayValue}
+          placeholder="—"
+          onFocus={e => { setLocalStr(null); e.target.select(); }}
+          onBlur={() => setLocalStr(null)}
+          onChange={e => {
+            const raw = e.target.value;
+            setLocalStr(raw);
+            if (raw === '' || raw === '-') {
+              onChange(raw === '' ? null : raw);
+              return;
+            }
+            // Accept both comma and dot as decimal separator
+            const normalized = raw.replace(',', '.');
+            const parsed = parseFloat(normalized);
+            if (!isNaN(parsed)) onChange(parsed);
+          }}
+          className="border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-green-500 w-full tabular-nums"
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col gap-0.5">
       <label className="text-xs text-gray-500">{label}</label>
       <input type={tipo} value={valor === null || valor === undefined ? '' : String(valor)}
-        placeholder={tipo === 'number' ? '—' : ''}
-        onFocus={e => tipo === 'number' && e.target.select()}
-        onChange={e => {
-          if (tipo === 'number') onChange(e.target.value === '' ? null : parseFloat(e.target.value));
-          else onChange(e.target.value);
-        }}
+        onChange={e => onChange(e.target.value)}
         className="border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-green-500 w-full tabular-nums"
       />
     </div>
