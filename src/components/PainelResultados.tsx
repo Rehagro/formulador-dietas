@@ -189,21 +189,6 @@ export default function PainelResultados({ resultado, leite }: Props) {
         </div>
       </div>
 
-      {/* Card leite potencial final — fator limitante */}
-      <div className="bg-gray-800 rounded-xl px-4 py-3 flex items-center justify-between">
-        <div>
-          <div className="text-xs text-gray-400 font-medium">Leite Potencial Final</div>
-          <div className="text-[11px] text-gray-500 mt-0.5">
-            limitado por <span className={`font-bold ${fator_limitante === 'energia' ? 'text-emerald-400' : 'text-violet-400'}`}>
-              {fator_limitante === 'energia' ? '⚡ energia' : '🧬 proteína'}
-            </span>
-          </div>
-        </div>
-        <div className="text-right">
-          <div className="text-2xl font-bold text-white tabular-nums">{leite_potencial_final.toFixed(1)}</div>
-          <div className="text-xs text-gray-400">kg/dia</div>
-        </div>
-      </div>
 
       {/* Seções expansíveis */}
       <Secao titulo="⚡ Energia & Carboidratos" chaves={['nel', 'ndt', 'cnf', 'amido', 'amido_deg']} resultado={resultado} refs={refs} />
