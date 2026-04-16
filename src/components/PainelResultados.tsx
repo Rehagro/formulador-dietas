@@ -7,6 +7,7 @@ import { formatarValor } from '../utils/calculos';
 interface Props {
   resultado: ResultadoDieta;
   leite: number;
+  precoLeite: number;
 }
 
 interface NutrienteRowProps {
@@ -118,7 +119,7 @@ function Secao({ titulo, chaves, resultado, refs, defaultOpen = false }: SecaoPr
   );
 }
 
-export default function PainelResultados({ resultado, leite }: Props) {
+export default function PainelResultados({ resultado, leite, precoLeite }: Props) {
   const refs = getReferenciasLactacao(leite);
   const { totalKgMS, cmsExigida, leite_potencial_nel, leite_potencial_prot, fator_limitante } = resultado;
   const pctCMS = cmsExigida > 0 ? (totalKgMS / cmsExigida) * 100 : 0;
@@ -159,34 +160,56 @@ export default function PainelResultados({ resultado, leite }: Props) {
         <div className="text-xs text-blue-500 text-right mt-1 tabular-nums">{pctCMS.toFixed(0)}%</div>
       </div>
 
-      {/* Cards de leite potencial — energia e proteína */}
+      {/* Cards de leite potencial + custos */}
       <div className="grid grid-cols-2 gap-2">
-        <div className={`border rounded-xl p-3 text-center ${fator_limitante === 'energia' ? 'bg-emerald-100 border-emerald-400 ring-2 ring-emerald-400' : 'bg-emerald-50 border-emerald-200'}`}>
-          <div className="text-xs font-semibold text-emerald-700 mb-1 flex items-center justify-center">
+        <div className={`border rounded-xl p-2 text-center ${fator_limitante === 'energia' ? 'bg-emerald-100 border-emerald-400 ring-2 ring-emerald-400' : 'bg-emerald-50 border-emerald-200'}`}>
+          <div className="text-[11px] font-semibold text-emerald-700 mb-0.5 flex items-center justify-center">
             ⚡ Leite Pot. Energia
             <InfoTooltip texto={
               "Leite potencial por energia — NRC 2021\n\nEnergia disponível para lactação:\nNEL disponível = NEL total da dieta − mantença\nMantença = 0,08 × PV^0,75  Mcal/dia\n\nExigência energética por kg de leite (NRC 2021, Eq. 3-14):\nNEL/kg = 0,0929×gord% + 0,0563×prot% + 0,0395×lact%\n\nLeite potencial = NEL disponível ÷ NEL/kg leite\n\nInterpretação: produção máxima suportada pela energia da dieta, descontada a mantença."
             } />
           </div>
-          <div className="text-2xl font-bold text-emerald-800 tabular-nums leading-tight">
+          <div className="text-xl font-bold text-emerald-800 tabular-nums leading-tight">
             {leite_potencial_nel.toFixed(1)}
           </div>
-          <div className="text-xs text-emerald-600 mt-0.5">kg/dia</div>
-          {fator_limitante === 'energia' && <div className="text-[10px] font-bold text-emerald-700 mt-1">⚠ FATOR LIMITANTE</div>}
+          <div className="text-[11px] text-emerald-600">kg/dia</div>
+          {fator_limitante === 'energia' && <div className="text-[10px] font-bold text-emerald-700 mt-0.5">⚠ FATOR LIMITANTE</div>}
         </div>
-        <div className={`border rounded-xl p-3 text-center ${fator_limitante === 'proteina' ? 'bg-violet-100 border-violet-400 ring-2 ring-violet-400' : 'bg-violet-50 border-violet-200'}`}>
-          <div className="text-xs font-semibold text-violet-700 mb-1 flex items-center justify-center">
+        <div className={`border rounded-xl p-2 text-center ${fator_limitante === 'proteina' ? 'bg-violet-100 border-violet-400 ring-2 ring-violet-400' : 'bg-violet-50 border-violet-200'}`}>
+          <div className="text-[11px] font-semibold text-violet-700 mb-0.5 flex items-center justify-center">
             🧬 Leite Pot. Proteína
             <InfoTooltip texto={
               "Leite potencial por proteína — NRC 2021\n\nUsa Proteína Metabolizável (PM): proteína que chega ao intestino.\n\nFontes de PM:\n• MP de PNDR = PNDR × 0,80  (digestibilidade intestinal)\n• MP microbiana = NDT(kg) × 1000 × 0,13 × 0,64\n  (130 g MCP/kg NDT × 64% de digestibilidade)\n\nMP total = MP de PNDR + MP microbiana\n\nDesconto de mantença proteica (NRC 2021, Cap. 4):\nMP mantença = 3,8 × PV^0,75  (g/dia)\nMP para leite = MP total − MP mantença\n\nLeite potencial = MP para leite ÷ (prot_leite% × 10 ÷ 0,67)\n\nO 0,67 é a eficiência de uso da PM para síntese de proteína do leite.\nO 3,8 × PV^0,75 cobre perdas endógenas (urinária + fecal + tegumentar)."
             } />
           </div>
-          <div className="text-2xl font-bold text-violet-800 tabular-nums leading-tight">
+          <div className="text-xl font-bold text-violet-800 tabular-nums leading-tight">
             {leite_potencial_prot.toFixed(1)}
           </div>
-          <div className="text-xs text-violet-600 mt-0.5">kg/dia</div>
-          {fator_limitante === 'proteina' && <div className="text-[10px] font-bold text-violet-700 mt-1">⚠ FATOR LIMITANTE</div>}
+          <div className="text-[11px] text-violet-600">kg/dia</div>
+          {fator_limitante === 'proteina' && <div className="text-[10px] font-bold text-violet-700 mt-0.5">⚠ FATOR LIMITANTE</div>}
         </div>
+      </div>
+
+      {/* Cards de custo/receita */}
+      <div className="grid grid-cols-2 gap-2">
+        <div className="border border-gray-200 rounded-xl p-2 bg-gray-50">
+          <div className="text-[11px] text-gray-500 font-medium">💰 Custo R$/dia</div>
+          <div className="text-base font-bold tabular-nums text-gray-800 leading-tight">R$ {resultado.custoTotal.toFixed(2)}</div>
+        </div>
+        <div className="border border-gray-200 rounded-xl p-2 bg-gray-50">
+          <div className="text-[11px] text-gray-500 font-medium">⚖️ Custo R$/kg MS</div>
+          <div className="text-base font-bold tabular-nums text-gray-800 leading-tight">R$ {resultado.custoKgMS.toFixed(3)}</div>
+        </div>
+        <div className="border border-gray-200 rounded-xl p-2 bg-gray-50">
+          <div className="text-[11px] text-gray-500 font-medium">🥛 Custo R$/litro</div>
+          <div className="text-base font-bold tabular-nums text-gray-800 leading-tight">R$ {resultado.custoLitro.toFixed(3)}</div>
+        </div>
+        {precoLeite > 0 && (
+          <div className="border border-green-200 rounded-xl p-2 bg-green-50">
+            <div className="text-[11px] text-green-700 font-medium">📈 Receita leite R$/d</div>
+            <div className="text-base font-bold tabular-nums text-green-800 leading-tight">R$ {(precoLeite * leite).toFixed(2)}</div>
+          </div>
+        )}
       </div>
 
 

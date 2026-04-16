@@ -134,7 +134,7 @@ export default function Formulador() {
       {/* Layout principal: 2 colunas — Animal + Resultados */}
       <div className="grid grid-cols-1 lg:grid-cols-[300px_1fr] gap-4">
         <PainelAnimal animal={dieta.animal} onChange={setAnimal} />
-        <PainelResultados resultado={resultado} leite={dieta.animal.leite} />
+        <PainelResultados resultado={resultado} leite={dieta.animal.leite} precoLeite={dieta.animal.precoLeite} />
       </div>
 
       {/* Tabela de ingredientes */}
@@ -148,7 +148,7 @@ export default function Formulador() {
       />
 
       {/* Indicadores */}
-      <Indicadores resultado={resultado} precoLeite={dieta.animal.precoLeite} />
+      <Indicadores resultado={resultado} />
     </div>
   );
 }

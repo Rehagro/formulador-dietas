@@ -3,17 +3,8 @@ import { REFERENCIAS_LACTACAO, getStatus, statusColor, statusDot } from '../util
 
 interface Props {
   resultado: ResultadoDieta;
-  precoLeite: number;
 }
 
-function IndicCard({ label, valor }: { label: string; valor: string }) {
-  return (
-    <div className="border border-gray-200 rounded-xl p-3 bg-gray-50">
-      <div className="text-xs text-gray-500 mb-1 font-medium">{label}</div>
-      <div className="text-base font-bold tabular-nums text-gray-800 leading-tight">{valor}</div>
-    </div>
-  );
-}
 
 function IndicStatus({ chave, resultado }: { chave: string; resultado: ResultadoDieta }) {
   const ref = REFERENCIAS_LACTACAO[chave];
@@ -47,12 +38,12 @@ function IndicStatus({ chave, resultado }: { chave: string; resultado: Resultado
   );
 }
 
-export default function Indicadores({ resultado, precoLeite }: Props) {
-  const { custoTotal, custoKgMS, custoLitro, kPf, kPc, kPl } = resultado;
+export default function Indicadores({ resultado }: Props) {
+  const { kPf, kPc, kPl } = resultado;
 
   return (
     <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
-      <h2 className="text-sm font-bold text-gray-700 mb-3">📈 Indicadores & Custos</h2>
+      <h2 className="text-sm font-bold text-gray-700 mb-3">📈 Indicadores</h2>
 
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2 mb-3">
         <IndicStatus chave="fdnf_kg_pv"      resultado={resultado} />
@@ -63,20 +54,12 @@ export default function Indicadores({ resultado, precoLeite }: Props) {
         <IndicStatus chave="dcad"            resultado={resultado} />
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-4 gap-2">
-        <IndicCard label="Custo R$/dia"     valor={`R$ ${custoTotal.toFixed(2)}`} />
-        <IndicCard label="Custo R$/kg MS"   valor={`R$ ${custoKgMS.toFixed(3)}`} />
-        <IndicCard label="Custo R$/litro"   valor={`R$ ${custoLitro.toFixed(3)}`} />
-        {precoLeite > 0 && (
-          <IndicCard label="Receita leite R$/d" valor={`R$ ${(precoLeite * resultado.totalKgMS).toFixed(2)}`} />
-        )}
-        <div className="border border-gray-200 rounded-xl p-3 bg-gray-50 col-span-1">
-          <div className="text-xs text-gray-500 mb-1 font-medium">Taxas de Passagem</div>
-          <div className="text-xs space-y-0.5 font-medium">
-            <div>kPf: <span className="font-bold tabular-nums">{(kPf * 100).toFixed(2)}%/h</span></div>
-            <div>kPc: <span className="font-bold tabular-nums">{(kPc * 100).toFixed(2)}%/h</span></div>
-            <div>kPl: <span className="font-bold tabular-nums">{(kPl * 100).toFixed(2)}%/h</span></div>
-          </div>
+      <div className="border border-gray-200 rounded-xl p-3 bg-gray-50 w-fit">
+        <div className="text-xs text-gray-500 mb-1 font-medium">Taxas de Passagem</div>
+        <div className="text-xs space-y-0.5 font-medium">
+          <div>kPf: <span className="font-bold tabular-nums">{(kPf * 100).toFixed(2)}%/h</span></div>
+          <div>kPc: <span className="font-bold tabular-nums">{(kPc * 100).toFixed(2)}%/h</span></div>
+          <div>kPl: <span className="font-bold tabular-nums">{(kPl * 100).toFixed(2)}%/h</span></div>
         </div>
       </div>
     </div>
