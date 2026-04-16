@@ -120,7 +120,7 @@ function Secao({ titulo, chaves, resultado, refs, defaultOpen = false }: SecaoPr
 
 export default function PainelResultados({ resultado, leite }: Props) {
   const refs = getReferenciasLactacao(leite);
-  const { totalKgMS, cmsExigida, leite_potencial_nel, leite_potencial_prot } = resultado;
+  const { totalKgMS, cmsExigida, leite_potencial_nel, leite_potencial_prot, leite_potencial_final, fator_limitante } = resultado;
   const pctCMS = cmsExigida > 0 ? (totalKgMS / cmsExigida) * 100 : 0;
 
   const barColor =
@@ -159,31 +159,49 @@ export default function PainelResultados({ resultado, leite }: Props) {
         <div className="text-xs text-blue-500 text-right mt-1 tabular-nums">{pctCMS.toFixed(0)}%</div>
       </div>
 
-      {/* Cards de leite potencial */}
+      {/* Cards de leite potencial — energia e proteína */}
       <div className="grid grid-cols-2 gap-2">
-        <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 text-center">
+        <div className={`border rounded-xl p-3 text-center ${fator_limitante === 'energia' ? 'bg-emerald-100 border-emerald-400 ring-2 ring-emerald-400' : 'bg-emerald-50 border-emerald-200'}`}>
           <div className="text-xs font-semibold text-emerald-700 mb-1 flex items-center justify-center">
-            ⚡ Leite Potencial Energia
+            ⚡ Leite Pot. Energia
             <InfoTooltip texto={
-              "Leite potencial por energia — NRC 2021\n\nEnergia disponível para lactação:\nNEL disponível = NEL total da dieta − mantença\nMantença = 0,08 × PV^0,75 Mcal/d\n\nExigência energética por kg de leite:\nNEL/kg = 0,0929×gord% + 0,0547×prot% + 0,0395×lact%\n\nLeite potencial = NEL disponível ÷ NEL/kg leite\n\nInterpretação: produção máxima suportada pela energia da dieta, descontada a mantença."
+              "Leite potencial por energia — NRC 2021\n\nEnergia disponível para lactação:\nNEL disponível = NEL total da dieta − mantença\nMantença = 0,08 × PV^0,75  Mcal/dia\n\nExigência energética por kg de leite (NRC 2021, Eq. 3-14):\nNEL/kg = 0,0929×gord% + 0,0563×prot% + 0,0395×lact%\n\nLeite potencial = NEL disponível ÷ NEL/kg leite\n\nInterpretação: produção máxima suportada pela energia da dieta, descontada a mantença."
             } />
           </div>
           <div className="text-2xl font-bold text-emerald-800 tabular-nums leading-tight">
             {leite_potencial_nel.toFixed(1)}
           </div>
           <div className="text-xs text-emerald-600 mt-0.5">kg/dia</div>
+          {fator_limitante === 'energia' && <div className="text-[10px] font-bold text-emerald-700 mt-1">⚠ FATOR LIMITANTE</div>}
         </div>
-        <div className="bg-violet-50 border border-violet-200 rounded-xl p-3 text-center">
+        <div className={`border rounded-xl p-3 text-center ${fator_limitante === 'proteina' ? 'bg-violet-100 border-violet-400 ring-2 ring-violet-400' : 'bg-violet-50 border-violet-200'}`}>
           <div className="text-xs font-semibold text-violet-700 mb-1 flex items-center justify-center">
-            🧬 Leite Potencial Proteína
+            🧬 Leite Pot. Proteína
             <InfoTooltip texto={
-              "Leite potencial por proteína — NRC 2021\n\nUsa Proteína Metabolizável (MP): proteína que chega ao intestino.\n\nFontes de MP:\n• MP de PNDR = PNDR × 0,80 (digestibilidade intestinal)\n• MP microbiana = NDT × 0,13 × 0,64\n  (130 g MCP/kg NDT × 64% de digestibilidade)\n\nMP total = MP de PNDR + MP microbiana\n\nLeite potencial = MP total ÷ (prot_leite% ÷ 0,67)\n\nO 0,67 é a eficiência de uso do MP para síntese de proteína do leite (NRC 2021)."
+              "Leite potencial por proteína — NRC 2021\n\nUsa Proteína Metabolizável (PM): proteína que chega ao intestino.\n\nFontes de PM:\n• MP de PNDR = PNDR × 0,80  (digestibilidade intestinal)\n• MP microbiana = NDT(kg) × 1000 × 0,13 × 0,64\n  (130 g MCP/kg NDT × 64% de digestibilidade)\n\nMP total = MP de PNDR + MP microbiana\n\nDesconto de mantença proteica (NRC 2021, Cap. 4):\nMP mantença = 3,8 × PV^0,75  (g/dia)\nMP para leite = MP total − MP mantença\n\nLeite potencial = MP para leite ÷ (prot_leite% × 10 ÷ 0,67)\n\nO 0,67 é a eficiência de uso da PM para síntese de proteína do leite.\nO 3,8 × PV^0,75 cobre perdas endógenas (urinária + fecal + tegumentar)."
             } />
           </div>
           <div className="text-2xl font-bold text-violet-800 tabular-nums leading-tight">
             {leite_potencial_prot.toFixed(1)}
           </div>
           <div className="text-xs text-violet-600 mt-0.5">kg/dia</div>
+          {fator_limitante === 'proteina' && <div className="text-[10px] font-bold text-violet-700 mt-1">⚠ FATOR LIMITANTE</div>}
+        </div>
+      </div>
+
+      {/* Card leite potencial final — fator limitante */}
+      <div className="bg-gray-800 rounded-xl px-4 py-3 flex items-center justify-between">
+        <div>
+          <div className="text-xs text-gray-400 font-medium">Leite Potencial Final</div>
+          <div className="text-[11px] text-gray-500 mt-0.5">
+            limitado por <span className={`font-bold ${fator_limitante === 'energia' ? 'text-emerald-400' : 'text-violet-400'}`}>
+              {fator_limitante === 'energia' ? '⚡ energia' : '🧬 proteína'}
+            </span>
+          </div>
+        </div>
+        <div className="text-right">
+          <div className="text-2xl font-bold text-white tabular-nums">{leite_potencial_final.toFixed(1)}</div>
+          <div className="text-xs text-gray-400">kg/dia</div>
         </div>
       </div>
 

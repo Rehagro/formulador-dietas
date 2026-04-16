@@ -148,6 +148,8 @@ export interface ResultadoDieta {
   kPl: number;
   leite_potencial_nel: number;
   leite_potencial_prot: number;
+  leite_potencial_final: number;
+  fator_limitante: 'energia' | 'proteina';
   // custo
   custoTotal: number;
   custoKgMS: number;

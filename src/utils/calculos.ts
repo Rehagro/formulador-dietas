@@ -180,24 +180,31 @@ export function calcularResultados(
   const nel_mcal_kg = kgNEL / ms;
 
   // ── Leite potencial pela energia (NEl) — NRC 2021 ──────────────────────────
-  // Mantença: NEm = 0,08 × PV^0,75 Mcal/d (NRC 2001/2021)
-  // Exigência energética por kg de leite (NRC 2021):
-  //   NEL/kg leite = 0,0929 × gordura% + 0,0547 × proteína% + 0,0395 × lactose%
+  // Mantença: NEm = 0,08 × PV^0,75 Mcal/d
+  // NEL/kg leite = 0,0929×gord% + 0,0563×prot% + 0,0395×lact%  (NRC 2021 Eq. 3-14)
   const nelMantenca = 0.08 * Math.pow(animal.peso, 0.75);
   const nelDisponivel = kgNEL - nelMantenca;
-  const nel_por_kg_leite = 0.0929 * animal.gordura + 0.0547 * animal.proteina + 0.0395 * animal.lactose;
+  const nel_por_kg_leite = 0.0929 * animal.gordura + 0.0563 * animal.proteina + 0.0395 * animal.lactose;
   const leite_potencial_nel = nel_por_kg_leite > 0 ? Math.max(0, nelDisponivel / nel_por_kg_leite) : 0;
 
   // ── Leite potencial pela proteína — NRC 2021 (Proteína Metabolizável) ──────
-  // MP de PNDR: PNDR × 0,80 (digestibilidade intestinal média — NRC)
-  // MP microbiana: NDT × 0,13 (130 g MCP/kg NDT) × 0,64 (digest. MCP — NRC)
-  // Eficiência de uso do MP para síntese de proteína do leite: 0,67 (NRC 2021)
-  const mp_pndr = kgPNDR * 0.80;
-  const mp_mcp  = kgNDT  * 0.13 * 0.64;
-  const mp_total = mp_pndr + mp_mcp;
+  // MP de PNDR (kg/d): PNDR × 0,80
+  // MP microbiana (kg/d): NDT(kg) × 0,13 × 0,64  → unidades consistentes em kg
+  // Mantença proteica (kg/d): 3,8 × PV^0,75 g/d ÷ 1000
+  // Eficiência de síntese de proteína do leite: 0,67
+  const mp_pndr    = kgPNDR * 0.80;
+  const mp_mcp     = kgNDT  * 0.13 * 0.64;
+  const mp_total   = mp_pndr + mp_mcp;
+  const mp_mantenca = 3.8 * Math.pow(animal.peso, 0.75) / 1000;  // g→kg
+  const mp_para_leite = Math.max(0, mp_total - mp_mantenca);
   const leite_potencial_prot = animal.proteina > 0
-    ? Math.max(0, mp_total / ((animal.proteina / 100) / 0.67))
+    ? Math.max(0, mp_para_leite / ((animal.proteina / 100) / 0.67))
     : 0;
+
+  // ── Fator limitante — mínimo entre energia e proteína ──────────────────────
+  const leite_potencial_final = Math.min(leite_potencial_nel, leite_potencial_prot);
+  const fator_limitante: 'energia' | 'proteina' =
+    leite_potencial_nel <= leite_potencial_prot ? 'energia' : 'proteina';
 
   const custoKgMS = totalKgMS > 0 ? custoTotal / totalKgMS : 0;
   const custoLitro = animal.leite > 0 ? custoTotal / animal.leite : 0;
@@ -261,6 +268,8 @@ export function calcularResultados(
     kPl,
     leite_potencial_nel,
     leite_potencial_prot,
+    leite_potencial_final,
+    fator_limitante,
     custoTotal,
     custoKgMS,
     custoLitro,
