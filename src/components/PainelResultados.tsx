@@ -120,7 +120,7 @@ function Secao({ titulo, chaves, resultado, refs, defaultOpen = false }: SecaoPr
 
 export default function PainelResultados({ resultado, leite }: Props) {
   const refs = getReferenciasLactacao(leite);
-  const { totalKgMS, cmsExigida, leite_potencial_nel, leite_potencial_prot, leite_potencial_final, fator_limitante } = resultado;
+  const { totalKgMS, cmsExigida, leite_potencial_nel, leite_potencial_prot, fator_limitante } = resultado;
   const pctCMS = cmsExigida > 0 ? (totalKgMS / cmsExigida) * 100 : 0;
 
   const barColor =
