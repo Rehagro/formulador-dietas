@@ -204,12 +204,93 @@ function Td({ children, align = 'right' }: { children: React.ReactNode; align?: 
   );
 }
 
+function EscolhaDialog({
+  nomeOriginal,
+  onOverwrite,
+  onCriarNovo,
+  onCancelar,
+}: {
+  nomeOriginal: string;
+  onOverwrite: () => void;
+  onCriarNovo: (nome: string) => void;
+  onCancelar: () => void;
+}) {
+  const [opcao, setOpcao] = useState<'overwrite' | 'novo'>('overwrite');
+  const [novoNome, setNovoNome] = useState('');
+
+  function confirmar() {
+    if (opcao === 'overwrite') {
+      onOverwrite();
+    } else {
+      const nome = novoNome.trim();
+      if (!nome) { alert('Digite um nome para o novo alimento.'); return; }
+      onCriarNovo(nome);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center">
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-md mx-4">
+        <div className="p-5 border-b border-gray-100">
+          <h2 className="font-bold text-gray-800 text-base">Salvar alterações</h2>
+          <p className="text-sm text-gray-500 mt-1">
+            O que deseja fazer com as alterações em <strong className="text-gray-700">{nomeOriginal}</strong>?
+          </p>
+        </div>
+
+        <div className="p-5 flex flex-col gap-3">
+          <label className={`flex items-start gap-3 p-3 border-2 rounded-xl cursor-pointer transition-colors ${opcao === 'overwrite' ? 'border-green-500 bg-green-50' : 'border-gray-200 hover:bg-gray-50'}`}>
+            <input type="radio" name="opcao" checked={opcao === 'overwrite'} onChange={() => setOpcao('overwrite')} className="mt-0.5 accent-green-600" />
+            <div>
+              <div className="text-sm font-semibold text-gray-800">Atualizar alimento existente</div>
+              <div className="text-xs text-gray-500 mt-0.5 leading-relaxed">
+                Sobrescreve <strong>{nomeOriginal}</strong> permanentemente com as novas informações. A formulação recalcula automaticamente.
+              </div>
+            </div>
+          </label>
+
+          <label className={`flex items-start gap-3 p-3 border-2 rounded-xl cursor-pointer transition-colors ${opcao === 'novo' ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:bg-gray-50'}`}>
+            <input type="radio" name="opcao" checked={opcao === 'novo'} onChange={() => setOpcao('novo')} className="mt-0.5 accent-blue-600" />
+            <div className="flex-1 min-w-0">
+              <div className="text-sm font-semibold text-gray-800">Criar novo alimento</div>
+              <div className="text-xs text-gray-500 mt-0.5 leading-relaxed">
+                Mantém o original intacto e cria uma cópia com as alterações. Na formulação, o novo substitui o anterior automaticamente.
+              </div>
+              {opcao === 'novo' && (
+                <input
+                  autoFocus
+                  type="text"
+                  value={novoNome}
+                  onChange={e => setNovoNome(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && confirmar()}
+                  placeholder="Nome do novo alimento..."
+                  className="mt-2 w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              )}
+            </div>
+          </label>
+        </div>
+
+        <div className="flex justify-end gap-2 px-5 pb-5">
+          <button onClick={onCancelar} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
+            Cancelar
+          </button>
+          <button onClick={confirmar} className="px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 transition-colors">
+            Confirmar
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function Alimentos() {
-  const { alimentos, adicionarAlimento, editarAlimento, excluirAlimento } = useDieta();
+  const { alimentos, adicionarAlimento, editarAlimento, excluirAlimento, atualizarNomeNosSlots } = useDieta();
   const [busca, setBusca] = useState('');
   const [filtroTipo, setFiltroTipo] = useState<'todos' | 'C' | 'F' | 'M'>('todos');
   const [editando, setEditando] = useState<Alimento | null>(null);
   const [novo, setNovo] = useState(false);
+  const [pendingEdit, setPendingEdit] = useState<{ original: Alimento; editado: Alimento } | null>(null);
 
   const filtrados = alimentos.filter(a =>
     (filtroTipo === 'todos' || a.tipo === filtroTipo) &&
@@ -228,11 +309,34 @@ export default function Alimentos() {
         <FormAlimento
           inicial={editando ?? ALIMENTO_VAZIO}
           onSalvar={async a => {
-            if (editando) await editarAlimento(editando.nome, a);
-            else await adicionarAlimento(a);
-            setEditando(null); setNovo(false);
+            if (editando) {
+              setPendingEdit({ original: editando, editado: a });
+              setEditando(null);
+            } else {
+              await adicionarAlimento(a);
+              setNovo(false);
+            }
           }}
           onCancelar={() => { setEditando(null); setNovo(false); }}
+        />
+      )}
+
+      {pendingEdit && (
+        <EscolhaDialog
+          nomeOriginal={pendingEdit.original.nome}
+          onOverwrite={async () => {
+            await editarAlimento(
+              pendingEdit.original.nome,
+              { ...pendingEdit.editado, nome: pendingEdit.original.nome, id: pendingEdit.original.id }
+            );
+            setPendingEdit(null);
+          }}
+          onCriarNovo={async novoNome => {
+            await adicionarAlimento({ ...pendingEdit.editado, nome: novoNome, id: undefined });
+            atualizarNomeNosSlots(pendingEdit.original.nome, novoNome);
+            setPendingEdit(null);
+          }}
+          onCancelar={() => setPendingEdit(null)}
         />
       )}
 

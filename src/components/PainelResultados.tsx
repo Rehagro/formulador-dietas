@@ -173,7 +173,6 @@ export default function PainelResultados({ resultado, leite, precoLeite }: Props
             {leite_potencial_nel.toFixed(1)}
           </div>
           <div className="text-[11px] text-emerald-600">kg/dia</div>
-          {fator_limitante === 'energia' && <div className="text-[10px] font-bold text-emerald-700 mt-0.5">⚠ FATOR LIMITANTE</div>}
         </div>
         <div className={`border rounded-xl p-2 text-center ${fator_limitante === 'proteina' ? 'bg-violet-100 border-violet-400 ring-2 ring-violet-400' : 'bg-violet-50 border-violet-200'}`}>
           <div className="text-[11px] font-semibold text-violet-700 mb-0.5 flex items-center justify-center">
@@ -186,7 +185,6 @@ export default function PainelResultados({ resultado, leite, precoLeite }: Props
             {leite_potencial_prot.toFixed(1)}
           </div>
           <div className="text-[11px] text-violet-600">kg/dia</div>
-          {fator_limitante === 'proteina' && <div className="text-[10px] font-bold text-violet-700 mt-0.5">⚠ FATOR LIMITANTE</div>}
         </div>
       </div>
 

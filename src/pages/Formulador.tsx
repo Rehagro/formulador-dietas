@@ -10,7 +10,7 @@ import { exportarXLSX } from '../utils/exportar';
 import { exportarPDF } from '../utils/exportarPDF';
 
 export default function Formulador() {
-  const { dieta, alimentos, setAnimal, setSlot, salvarDieta, novaDieta, adicionarSlot, reordenarSlots } = useDieta();
+  const { dieta, alimentos, setAnimal, setSlot, salvarDieta, novaDieta, adicionarSlot, reordenarSlots, removerSlot } = useDieta();
   const [nomeDieta, setNomeDieta] = useState(dieta.nome);
   const [salvando, setSalvando] = useState(false);
   const [exportandoXLSX, setExportandoXLSX] = useState(false);
@@ -145,6 +145,7 @@ export default function Formulador() {
         onSlotChange={setSlot}
         onAdicionarSlot={adicionarSlot}
         onReordenar={reordenarSlots}
+        onRemoverSlot={removerSlot}
       />
 
       {/* Indicadores */}

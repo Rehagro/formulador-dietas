@@ -66,6 +66,8 @@ interface DietaContextType {
   renomearDieta: (id: string, nome: string) => Promise<void>;
   adicionarSlot: () => void;
   reordenarSlots: (de: number, para: number) => void;
+  removerSlot: (idx: number) => void;
+  atualizarNomeNosSlots: (nomeAntigo: string, nomeNovo: string) => void;
   adicionarAlimento: (a: Alimento) => Promise<void>;
   editarAlimento: (nomeOriginal: string, a: Alimento) => Promise<void>;
   excluirAlimento: (nome: string) => Promise<void>;
@@ -190,6 +192,25 @@ export function DietaProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
+  const removerSlot = useCallback((idx: number) => {
+    setDieta(d => {
+      const slots = d.slots.filter((_, i) => i !== idx);
+      while (slots.length < 4) {
+        slots.push({ id: gerarId(), alimentoNome: null, kgMN: 0 });
+      }
+      return { ...d, slots };
+    });
+  }, []);
+
+  const atualizarNomeNosSlots = useCallback((nomeAntigo: string, nomeNovo: string) => {
+    setDieta(d => ({
+      ...d,
+      slots: d.slots.map(s =>
+        s.alimentoNome === nomeAntigo ? { ...s, alimentoNome: nomeNovo } : s
+      ),
+    }));
+  }, []);
+
   const adicionarSlot = useCallback(() => {
     setDieta(d => ({
       ...d,
@@ -231,7 +252,7 @@ export function DietaProvider({ children }: { children: ReactNode }) {
       dieta, alimentos, dietas, carregando, usuario, logout,
       setAnimal, setSlot,
       salvarDieta, carregarDieta, novaDieta, duplicarDieta, excluirDieta, renomearDieta,
-      adicionarSlot, reordenarSlots,
+      adicionarSlot, reordenarSlots, removerSlot, atualizarNomeNosSlots,
       adicionarAlimento, editarAlimento, excluirAlimento,
     }}>
       {children}

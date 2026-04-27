@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { X, ChevronDown, Plus, GripVertical } from 'lucide-react';
+import { X, ChevronDown, Plus, GripVertical, Trash2 } from 'lucide-react';
 import type { SlotIngrediente, Alimento } from '../types';
 import { calcularNelAlimento } from '../utils/calculos';
 
@@ -11,6 +11,7 @@ interface Props {
   onSlotChange: (idx: number, partial: Partial<SlotIngrediente>) => void;
   onAdicionarSlot: () => void;
   onReordenar: (de: number, para: number) => void;
+  onRemoverSlot: (idx: number) => void;
 }
 
 function AlimentoSelect({
@@ -128,7 +129,7 @@ function AlimentoSelect({
   );
 }
 
-export default function TabelaIngredientes({ slots, alimentos, totalKgMS, onSlotChange, onAdicionarSlot, onReordenar }: Props) {
+export default function TabelaIngredientes({ slots, alimentos, totalKgMS, onSlotChange, onAdicionarSlot, onReordenar, onRemoverSlot }: Props) {
   const [units, setUnits] = useState<Record<string, 'kg' | 'g'>>({});
   const [dragIdx, setDragIdx] = useState<number | null>(null);
   const [overIdx, setOverIdx] = useState<number | null>(null);
@@ -140,7 +141,7 @@ export default function TabelaIngredientes({ slots, alimentos, totalKgMS, onSlot
           <thead className="bg-gray-50 border-b border-gray-200">
             <tr>
               <th className="w-6 px-1" />
-              <th className="text-left px-3 py-2.5 font-semibold text-gray-500 w-8">#</th>
+              <th className="w-8 px-2 py-2.5" />
               <th className="text-left px-3 py-2.5 font-semibold text-gray-500 min-w-[220px]">Alimento</th>
               <th className="text-right px-2 py-2.5 font-semibold text-gray-500">kg MN</th>
               <th className="text-right px-2 py-2.5 font-semibold text-gray-500">kg MS</th>
@@ -180,7 +181,15 @@ export default function TabelaIngredientes({ slots, alimentos, totalKgMS, onSlot
                   <td className="px-1 py-1.5 text-gray-300 cursor-grab active:cursor-grabbing">
                     <GripVertical size={14} />
                   </td>
-                  <td className="px-3 py-1.5 text-gray-400 tabular-nums">{idx + 1}</td>
+                  <td className="px-2 py-1.5 text-center">
+                    <button
+                      onClick={() => onRemoverSlot(idx)}
+                      className="p-1 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded transition-colors"
+                      title="Remover ingrediente"
+                    >
+                      <Trash2 size={12} />
+                    </button>
+                  </td>
                   <td className="px-2 py-1">
                     <AlimentoSelect
                       value={slot.alimentoNome}
