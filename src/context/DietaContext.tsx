@@ -95,10 +95,15 @@ export function DietaProvider({ children }: { children: ReactNode }) {
           getAlimentosCustomSupabase(),
         ]);
 
+        // Deduplica por nome (mantém o mais recente — último no array por criado_em asc)
+        const customMap = new Map<string, Alimento>();
+        for (const a of customDB) customMap.set(a.nome, a);
+        const customArr = Array.from(customMap.values());
+
         // Mescla alimentos base + custom (custom sobrescreve base por nome)
         const base = alimentosBase as Alimento[];
-        const customNomes = new Set(customDB.map(a => a.nome));
-        const merged = [...base.filter(a => !customNomes.has(a.nome)), ...customDB]
+        const customNomes = new Set(customArr.map(a => a.nome));
+        const merged = [...base.filter(a => !customNomes.has(a.nome)), ...customArr]
           .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
         setAlimentos(merged);
 
@@ -231,13 +236,16 @@ export function DietaProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const editarAlimento = useCallback(async (nomeOriginal: string, a: Alimento) => {
-    const id = await saveAlimentoCustomSupabase(a);
-    const comId = { ...a, id };
+    // Reutiliza o ID existente para evitar criar linhas duplicadas no Supabase
+    const existing = alimentos.find(x => x.nome === nomeOriginal);
+    const aComId = { ...a, id: a.id ?? existing?.id };
+    const id = await saveAlimentoCustomSupabase(aComId);
+    const comId = { ...aComId, id };
     setAlimentos(prev =>
       prev.map(x => x.nome === nomeOriginal ? comId : x)
         .sort((x, y) => x.nome.localeCompare(y.nome, 'pt-BR'))
     );
-  }, []);
+  }, [alimentos]);
 
   const excluirAlimento = useCallback(async (nome: string) => {
     const alimentoCustom = alimentos.find(x => x.nome === nome && x.id);
