@@ -190,9 +190,9 @@ export function calcularResultados(
   const nel_mcal_kg = kgNEL / ms;
 
   // ── Leite potencial pela energia (NEl) — NRC 2021 ──────────────────────────
-  // Mantença: NEm = 0,08 × PV^0,75 Mcal/d
-  // NEL/kg leite = 0,0929×gord% + 0,0563×prot% + 0,0395×lact%  (NRC 2021 Eq. 3-14)
-  const nelMantenca = 0.08 * Math.pow(animal.peso, 0.75);
+  // Mantença: NEm = 0,10 × PV^0,75 Mcal/d (NRC 2021 Eq. 3-13; era 0,08 no NRC 2001)
+  // NEL/kg leite = 0,0929×gord% + 0,055×prot% + 0,0395×lact%  (NRC 2021 Eq. 3-14a)
+  const nelMantenca = 0.10 * Math.pow(animal.peso, 0.75);
   const nelDisponivel = kgNEL - nelMantenca;
   const nel_por_kg_leite = 0.0929 * animal.gordura + 0.055 * animal.proteina + 0.0395 * animal.lactose;
   const leite_potencial_nel = nel_por_kg_leite > 0 ? Math.max(0, nelDisponivel / nel_por_kg_leite) : 0;
