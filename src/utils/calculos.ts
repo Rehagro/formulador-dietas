@@ -194,21 +194,27 @@ export function calcularResultados(
   // NEL/kg leite = 0,0929×gord% + 0,0563×prot% + 0,0395×lact%  (NRC 2021 Eq. 3-14)
   const nelMantenca = 0.08 * Math.pow(animal.peso, 0.75);
   const nelDisponivel = kgNEL - nelMantenca;
-  const nel_por_kg_leite = 0.0929 * animal.gordura + 0.0563 * animal.proteina + 0.0395 * animal.lactose;
+  const nel_por_kg_leite = 0.0929 * animal.gordura + 0.055 * animal.proteina + 0.0395 * animal.lactose;
   const leite_potencial_nel = nel_por_kg_leite > 0 ? Math.max(0, nelDisponivel / nel_por_kg_leite) : 0;
 
   // ── Leite potencial pela proteína — NRC 2021 (Proteína Metabolizável) ──────
-  // MP de PNDR (kg/d): PNDR × 0,80
-  // MP microbiana (kg/d): NDT(kg) × 0,13 × 0,64  → unidades consistentes em kg
-  // Mantença proteica (kg/d): 3,8 × PV^0,75 g/d ÷ 1000
-  // Eficiência de síntese de proteína do leite: 0,67
-  const mp_pndr    = kgPNDR * 0.80;
-  const mp_mcp     = kgNDT  * 0.13 * 0.64;
-  const mp_total   = mp_pndr + mp_mcp;
-  const mp_mantenca = 3.8 * Math.pow(animal.peso, 0.75) / 1000;  // g→kg
+  // An_MPIn = digestível RUP + proteína verdadeira microbiana digestível
+  // Du_idMiTP = Du_MiCP × 0.80 × 0.824 (NRC 2021 Eq. 20-135 × Eq. 20-127)
+  const mp_rup    = kgPNDR * 0.80;
+  const mp_mcp    = kgNDT  * 0.13 * 0.80 * 0.824;
+  const mp_total  = mp_rup + mp_mcp;
+
+  // Manutenção NP (NRC 2021 Eq. 20-283/285, 20-294/295, 20-300/302)
+  const Scrf_NP  = 0.20 * Math.pow(animal.peso, 0.60) * 0.86 / 1000;
+  const Ur_NPend = 0.053 * animal.peso * 6.25 / 1000;
+  const fdn_pct  = totalKgMS > 0 ? (kgFDN / totalKgMS) * 100 : 0;
+  const Fe_NPend = totalKgMS > 0 ? 0.73 * (12.0 + 0.12 * fdn_pct) * totalKgMS / 1000 : 0;
+  const mp_mantenca = Scrf_NP + Ur_NPend + Fe_NPend;
+
   const mp_para_leite = Math.max(0, mp_total - mp_mantenca);
+  // KlMP_NP,Trg = 0.69 (NRC 2021 Eq. 20-214)
   const leite_potencial_prot = animal.proteina > 0
-    ? Math.max(0, mp_para_leite / ((animal.proteina / 100) / 0.67))
+    ? Math.max(0, mp_para_leite * 0.69 / (animal.proteina / 100))
     : 0;
 
   // ── Fator limitante — mínimo entre energia e proteína ──────────────────────
