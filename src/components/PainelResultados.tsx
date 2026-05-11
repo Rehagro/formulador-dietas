@@ -164,7 +164,7 @@ export default function PainelResultados({ resultado, leite, precoLeite }: Props
       <div className="grid grid-cols-2 gap-2">
         <div className={`border rounded-xl p-2 text-center ${fator_limitante === 'energia' ? 'bg-emerald-100 border-emerald-400 ring-2 ring-emerald-400' : 'bg-emerald-50 border-emerald-200'}`}>
           <div className="text-[11px] font-semibold text-emerald-700 mb-0.5 flex items-center justify-center">
-            ⚡ Leite Pot. Energia
+            ⚡ Leite Potencial para Energia
             <InfoTooltip texto={
               "Leite potencial por energia — NRC 2021\n\nEnergia disponível para lactação:\nNEL disponível = NEL total da dieta − mantença\nMantença = 0,08 × PV^0,75  Mcal/dia\n\nExigência energética por kg de leite (NRC 2021, Eq. 3-14):\nNEL/kg = 0,0929×gord% + 0,0563×prot% + 0,0395×lact%\n\nLeite potencial = NEL disponível ÷ NEL/kg leite\n\nInterpretação: produção máxima suportada pela energia da dieta, descontada a mantença."
             } />
@@ -176,7 +176,7 @@ export default function PainelResultados({ resultado, leite, precoLeite }: Props
         </div>
         <div className={`border rounded-xl p-2 text-center ${fator_limitante === 'proteina' ? 'bg-violet-100 border-violet-400 ring-2 ring-violet-400' : 'bg-violet-50 border-violet-200'}`}>
           <div className="text-[11px] font-semibold text-violet-700 mb-0.5 flex items-center justify-center">
-            🧬 Leite Pot. Proteína
+            🧬 Leite Potencial para Proteína
             <InfoTooltip texto={
               "Leite potencial por proteína — NRC 2021\n\nUsa Proteína Metabolizável (PM): proteína que chega ao intestino.\n\nFontes de PM:\n• MP de PNDR = PNDR × 0,80  (digestibilidade intestinal)\n• MP microbiana = NDT(kg) × 1000 × 0,13 × 0,64\n  (130 g MCP/kg NDT × 64% de digestibilidade)\n\nMP total = MP de PNDR + MP microbiana\n\nDesconto de mantença proteica (NRC 2021, Cap. 4):\nMP mantença = 3,8 × PV^0,75  (g/dia)\nMP para leite = MP total − MP mantença\n\nLeite potencial = MP para leite ÷ (prot_leite% × 10 ÷ 0,67)\n\nO 0,67 é a eficiência de uso da PM para síntese de proteína do leite.\nO 3,8 × PV^0,75 cobre perdas endógenas (urinária + fecal + tegumentar)."
             } />

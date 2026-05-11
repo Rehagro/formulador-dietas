@@ -112,30 +112,6 @@ export default function Calculos() {
           </Formula>
         </div>
 
-        {/* Nota sobre mudança NRC 2001 → 2021 */}
-        <div className="flex gap-3 bg-blue-50 border border-blue-300 rounded-xl p-4">
-          <div className="text-blue-500 text-xl flex-shrink-0">ℹ️</div>
-          <div>
-            <div className="font-semibold text-blue-800 text-sm mb-1">
-              Ajustes NRC 2001 → NRC 2021 aplicados no formulador
-            </div>
-            <ul className="text-sm text-blue-700 space-y-1 list-disc list-inside">
-              <li>
-                <strong>Coeficiente da proteína no NEL_leite:</strong> corrigido de 0,0563 para <strong>0,055</strong>
-                {" "}(NRC 2021 Eq. 20-217 — proteína bruta em vez de proteína verdadeira).
-              </li>
-              <li>
-                <strong>Fator de correção para FDN removido:</strong> o NRC 2001 penalizava o CMS de dietas com alta FDN.
-                O NRC 2021 incorpora esse efeito diretamente pela composição do leite e pelo modelo temporal.
-              </li>
-              <li>
-                <strong>Equação unificada pré/pós-pico:</strong> o NRC 2021 usa uma única equação para toda a lactação
-                com o Fator Temporal, eliminando a equação separada para vacas pré-pico do NRC 2001.
-              </li>
-            </ul>
-          </div>
-        </div>
-
         <div>
           <h3 className="font-semibold text-gray-800 mb-2">Variáveis</h3>
           <div className="overflow-x-auto">
@@ -202,24 +178,6 @@ export default function Calculos() {
           </p>
         </div>
 
-        {/* Nota sobre mudança NRC 2001 → 2021 */}
-        <div className="flex gap-3 bg-amber-50 border border-amber-300 rounded-xl p-4">
-          <div className="text-amber-500 text-xl flex-shrink-0">⚠️</div>
-          <div>
-            <div className="font-semibold text-amber-800 text-sm mb-1">
-              Mudança importante: NRC 2001 → NRC 2021 (8ª edição)
-            </div>
-            <p className="text-sm text-amber-700">
-              O NRC 2021 <strong>aumentou o coeficiente de manutenção energética de 0,08 para 0,10</strong> Mcal/kg PV^0,75/d
-              — um aumento de <strong>25%</strong>. A justificativa, baseada em Moraes et al. (2015) com dados da
-              Unidade de Metabolismo Energético de Beltsville (1974–1995), é que vacas leiteiras modernas têm
-              taxa metabólica basal maior que as de 50 anos atrás, reflexo da seleção intensa para alta produção
-              (NRC 2021, Tabela 3-2, Cap. 3). Para uma vaca de 680 kg, isso significa <strong>+2,6 Mcal/d</strong> a
-              mais de manutenção, o que <strong>reduz o leite potencial previsto em ~3,7 kg/d</strong>.
-            </p>
-          </div>
-        </div>
-
         <div>
           <h3 className="font-semibold text-gray-800 mb-2">Fórmula</h3>
           <Formula>
@@ -231,8 +189,6 @@ export default function Calculos() {
             {"\n"}
             <span className="text-cyan-300">NEL_mantença</span>{" "}={" "}
             <span className="text-orange-300">0,10</span>{" "}× PV^0,75{"  "}[Mcal/d]
-            {"\n"}
-            <span className="text-gray-500">{"                          ↑ era 0,08 no NRC 2001 — aumentado 25% no NRC 2021"}</span>
             {"\n\n"}
             <span className="text-gray-400">{"# NEL disponível para produção de leite"}</span>
             {"\n"}
@@ -267,9 +223,9 @@ export default function Calculos() {
               <tbody>
                 <Var nome="NEL_alimento" desc="Energia líquida de lactação do alimento (tabela do banco de dados)" unidade="Mcal/kg MS" exemplo="varia" />
                 <Var nome="PV"           desc="Peso vivo"                                                           unidade="kg"        exemplo="680" />
-                <Var nome="0,10"         desc="Coeficiente de manutenção — NRC 2021 Eq. 3-13 (era 0,08 no NRC 2001)" unidade="Mcal/kg^0,75" exemplo="—" />
+                <Var nome="0,10"         desc="Coeficiente de manutenção energética (NRC 2021 Eq. 3-13)"              unidade="Mcal/kg^0,75" exemplo="—" />
                 <Var nome="G"            desc="Teor de gordura do leite"                                            unidade="%"         exemplo="3,7" />
-                <Var nome="PB"           desc="Teor de proteína bruta do leite (coef. 0,055 = proteína bruta)"     unidade="%"         exemplo="3,2" />
+                <Var nome="PB"           desc="Teor de proteína bruta do leite"                                     unidade="%"         exemplo="3,2" />
                 <Var nome="Lact"         desc="Teor de lactose do leite"                                            unidade="%"         exemplo="4,6" />
               </tbody>
             </table>
@@ -287,9 +243,9 @@ export default function Calculos() {
             <Passo n={1} label="NEL total fornecida pela dieta"
               formula="1,72 Mcal/kg × 25,5 kg MS/d"
               resultado="= 43,9 Mcal/d" />
-            <Passo n={2} label="NEL para manutenção (NRC 2021: coef. 0,10)"
+            <Passo n={2} label="NEL para manutenção (coef. 0,10 — NRC 2021 Eq. 3-13)"
               formula="0,10 × 680^0,75  =  0,10 × 133,2"
-              resultado="= 13,3 Mcal/d  [seria 10,7 com o NRC 2001 → diferença de 2,6 Mcal/d]" />
+              resultado="= 13,3 Mcal/d" />
             <Passo n={3} label="NEL disponível para o leite"
               formula="43,9 − 13,3"
               resultado="= 30,6 Mcal/d" />
@@ -298,42 +254,7 @@ export default function Calculos() {
               resultado="= 0,344 + 0,176 + 0,182  =  0,701 Mcal/kg" />
             <Passo n={5} label="Leite potencial pela energia"
               formula="30,6 ÷ 0,701"
-              resultado="≈ 43,7 kg/d  [seria 47,4 kg/d com NRC 2001 → diferença de 3,7 kg/d]" />
-          </div>
-
-          {/* Comparação visual NRC 2001 vs 2021 */}
-          <div className="mt-4 overflow-x-auto">
-            <table className="w-full text-sm text-left border border-amber-200 rounded-xl overflow-hidden">
-              <thead>
-                <tr className="bg-amber-100">
-                  <th className="px-4 py-2 font-semibold text-amber-800">Passo</th>
-                  <th className="px-4 py-2 font-semibold text-gray-500">NRC 2001 (antigo)</th>
-                  <th className="px-4 py-2 font-semibold text-amber-700">NRC 2021 (atual)</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-amber-100 bg-white">
-                <tr>
-                  <td className="px-4 py-2 text-gray-600">Coeficiente manutenção</td>
-                  <td className="px-4 py-2 text-gray-400 line-through">0,08</td>
-                  <td className="px-4 py-2 font-bold text-amber-700">0,10  (+25%)</td>
-                </tr>
-                <tr>
-                  <td className="px-4 py-2 text-gray-600">NEL manutenção (680 kg)</td>
-                  <td className="px-4 py-2 text-gray-400 line-through">10,7 Mcal/d</td>
-                  <td className="px-4 py-2 font-bold text-amber-700">13,3 Mcal/d  (+2,6 Mcal/d)</td>
-                </tr>
-                <tr>
-                  <td className="px-4 py-2 text-gray-600">NEL disponível para leite</td>
-                  <td className="px-4 py-2 text-gray-400 line-through">33,2 Mcal/d</td>
-                  <td className="px-4 py-2 font-bold text-amber-700">30,6 Mcal/d  (−2,6 Mcal/d)</td>
-                </tr>
-                <tr className="bg-amber-50">
-                  <td className="px-4 py-2 font-semibold text-gray-700">Leite potencial NEL</td>
-                  <td className="px-4 py-2 text-gray-400 line-through">47,4 kg/d</td>
-                  <td className="px-4 py-2 font-bold text-amber-700">43,7 kg/d  (−3,7 kg/d)</td>
-                </tr>
-              </tbody>
-            </table>
+              resultado="≈ 43,7 kg/d" />
           </div>
 
           <div className="mt-4 rounded-lg bg-amber-100 px-4 py-3 text-sm text-amber-800">
@@ -487,7 +408,7 @@ export default function Calculos() {
           </div>
           <div className="mt-3 rounded-lg bg-violet-100 px-4 py-2 text-sm text-violet-800">
             <strong>Interpretação:</strong> Com essa dieta, a proteína metabolizável suportaria ~71,7 kg de leite/d.
-            Como o leite potencial pela <em>energia</em> é muito menor (~43,7 kg/d, calculado com NRC 2021),
+            Como o leite potencial pela <em>energia</em> é muito menor (~43,7 kg/d),
             a <strong>energia é o fator limitante</strong> — há proteína em excesso relativo à energia nessa dieta.
             Quando o leite pela PM for o menor dos dois, dizemos que a proteína está limitando a produção.
           </div>
