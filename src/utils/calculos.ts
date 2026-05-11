@@ -1,14 +1,16 @@
 import type { Alimento, AnimalLactacao, SlotIngrediente, ResultadoDieta } from '../types';
 
-export function calcularCMSExigida(animal: AnimalLactacao, fdnDieta = 0): number {
-  // NRC 2021 — Eq. 4-1 (base) + limitante físico de FDN + ajuste pré-pico
+export function calcularCMSExigida(animal: AnimalLactacao): number {
+  // NRC 2021 Eq. 20-21 (Dt_DMIn_Lact1)
+  // Paridade: 0 = primípara, 1 = multípara (equivalente a An_Parity - 1 do NRC)
   const { ecc, paridade, peso, del, leite, gordura, proteina, lactose } = animal;
 
-  // NEL/kg leite (NRC 2021 Eq. 3-14): coeficiente proteína = 0,0563
-  const nel_leite = 0.0929 * gordura + 0.0563 * proteina + 0.0395 * lactose;
+  // NEL/kg leite: NRC 2021 Eq. 20-217 com PB (Crude Protein) → coeficiente 0.055
+  // (NRC 2021: "if milk CP is known, replace 5.85 with 5.5")
+  const nel_leite = 0.0929 * gordura + 0.055 * proteina + 0.0395 * lactose;
 
-  // CMS base (NRC 2021 Eq. 4-1) — mesma estrutura NRC 2001 com coeficiente nel corrigido
-  const cms_base = (
+  // Eq. 20-21: CMS base
+  const cms = (
     3.7 +
     (paridade * 5.7) +
     (0.305 * nel_leite * leite) +
@@ -16,21 +18,8 @@ export function calcularCMSExigida(animal: AnimalLactacao, fdnDieta = 0): number
     ((-0.689 - 1.87 * paridade) * ecc)
   ) * (1 - (0.212 + paridade * 0.136) * Math.exp(-0.053 * del));
 
-  // Limitante físico de FDN (NRC 2021): divide pelo fator FDN
-  // fdnDieta é fração decimal (ex: 0,38 para 38% FDN)
-  const fdn_fracao = fdnDieta > 0 ? fdnDieta : 0;
-  const cms_fdn = fdn_fracao > 0 ? cms_base / (1 - 0.63 * fdn_fracao) : cms_base;
-
-  // Ajuste pré-pico (NRC 2021): DEL ≤ 21 dias — ramp-up linear
-  let cms_final = cms_fdn;
-  if (del <= 21 && del > 0) {
-    cms_final = (0.52 + 0.024 * del) * cms_fdn;
-  }
-
   // Teto biológico: máx 5% do PV
-  cms_final = Math.min(cms_final, peso * 0.05);
-
-  return Math.max(0, cms_final);
+  return Math.max(0, Math.min(cms, peso * 0.05));
 }
 
 export function calcularNelAlimento(a: Alimento): number {
@@ -110,19 +99,7 @@ export function calcularResultados(
   alimentos: Alimento[],
   animal: AnimalLactacao
 ): ResultadoDieta {
-  // Pré-cálculo de FDN da dieta para usar no limitante físico do CMS (NRC 2021)
-  let _preMS = 0, _preFDN = 0;
-  for (const slot of slots) {
-    if (!slot.alimentoNome || slot.kgMN <= 0) continue;
-    const a = alimentos.find(x => x.nome === slot.alimentoNome);
-    if (!a) continue;
-    const kgMS = slot.kgMN * a.ms;
-    _preMS += kgMS;
-    _preFDN += (a.fdn ?? 0) * kgMS;
-  }
-  const fdnDieta = _preMS > 0 ? _preFDN / _preMS : 0;
-
-  const cmsExigida = calcularCMSExigida(animal, fdnDieta);
+  const cmsExigida = calcularCMSExigida(animal);
   const { kPf, kPc, kPl } = calcularTaxasPassagem(slots, alimentos, animal);
 
   let totalKgMN = 0;
