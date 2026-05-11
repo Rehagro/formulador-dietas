@@ -6,6 +6,7 @@ import Header from './components/Header';
 import Formulador from './pages/Formulador';
 import Alimentos from './pages/Alimentos';
 import Dietas from './pages/Dietas';
+import Calculos from './pages/Calculos';
 import Login from './pages/Login';
 import Cadastro from './pages/Cadastro';
 
@@ -62,6 +63,7 @@ export default function App() {
           <Route index element={<Formulador />} />
           <Route path="alimentos" element={<Alimentos />} />
           <Route path="dietas" element={<Dietas />} />
+          <Route path="calculos" element={<Calculos />} />
         </Route>
       </Routes>
     </BrowserRouter>
