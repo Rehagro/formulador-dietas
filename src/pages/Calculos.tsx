@@ -112,6 +112,30 @@ export default function Calculos() {
           </Formula>
         </div>
 
+        {/* Nota sobre mudança NRC 2001 → 2021 */}
+        <div className="flex gap-3 bg-blue-50 border border-blue-300 rounded-xl p-4">
+          <div className="text-blue-500 text-xl flex-shrink-0">ℹ️</div>
+          <div>
+            <div className="font-semibold text-blue-800 text-sm mb-1">
+              Ajustes NRC 2001 → NRC 2021 aplicados no formulador
+            </div>
+            <ul className="text-sm text-blue-700 space-y-1 list-disc list-inside">
+              <li>
+                <strong>Coeficiente da proteína no NEL_leite:</strong> corrigido de 0,0563 para <strong>0,055</strong>
+                {" "}(NRC 2021 Eq. 20-217 — proteína bruta em vez de proteína verdadeira).
+              </li>
+              <li>
+                <strong>Fator de correção para FDN removido:</strong> o NRC 2001 penalizava o CMS de dietas com alta FDN.
+                O NRC 2021 incorpora esse efeito diretamente pela composição do leite e pelo modelo temporal.
+              </li>
+              <li>
+                <strong>Equação unificada pré/pós-pico:</strong> o NRC 2021 usa uma única equação para toda a lactação
+                com o Fator Temporal, eliminando a equação separada para vacas pré-pico do NRC 2001.
+              </li>
+            </ul>
+          </div>
+        </div>
+
         <div>
           <h3 className="font-semibold text-gray-800 mb-2">Variáveis</h3>
           <div className="overflow-x-auto">
@@ -190,8 +214,8 @@ export default function Calculos() {
               — um aumento de <strong>25%</strong>. A justificativa, baseada em Moraes et al. (2015) com dados da
               Unidade de Metabolismo Energético de Beltsville (1974–1995), é que vacas leiteiras modernas têm
               taxa metabólica basal maior que as de 50 anos atrás, reflexo da seleção intensa para alta produção
-              (NRC 2021, Tabela 3-2, Cap. 3). Para uma vaca de 680 kg, isso significa <strong>+3,5 Mcal/d</strong> a
-              mais de manutenção, o que <strong>reduz o leite potencial previsto em ~5 kg/d</strong>.
+              (NRC 2021, Tabela 3-2, Cap. 3). Para uma vaca de 680 kg, isso significa <strong>+2,6 Mcal/d</strong> a
+              mais de manutenção, o que <strong>reduz o leite potencial previsto em ~3,7 kg/d</strong>.
             </p>
           </div>
         </div>
@@ -264,17 +288,17 @@ export default function Calculos() {
               formula="1,72 Mcal/kg × 25,5 kg MS/d"
               resultado="= 43,9 Mcal/d" />
             <Passo n={2} label="NEL para manutenção (NRC 2021: coef. 0,10)"
-              formula="0,10 × 680^0,75  =  0,10 × 172,8"
-              resultado="= 17,3 Mcal/d  [seria 13,8 com o NRC 2001 → diferença de 3,5 Mcal/d]" />
+              formula="0,10 × 680^0,75  =  0,10 × 133,2"
+              resultado="= 13,3 Mcal/d  [seria 10,7 com o NRC 2001 → diferença de 2,6 Mcal/d]" />
             <Passo n={3} label="NEL disponível para o leite"
-              formula="43,9 − 17,3"
-              resultado="= 26,6 Mcal/d" />
+              formula="43,9 − 13,3"
+              resultado="= 30,6 Mcal/d" />
             <Passo n={4} label="NEL necessária por kg de leite (Eq. 3-14a)"
               formula="0,0929×3,7 + 0,055×3,2 + 0,0395×4,6"
               resultado="= 0,344 + 0,176 + 0,182  =  0,701 Mcal/kg" />
             <Passo n={5} label="Leite potencial pela energia"
-              formula="26,6 ÷ 0,701"
-              resultado="≈ 37,9 kg/d  [seria 42,9 kg/d com NRC 2001 → diferença de ~5 kg/d]" />
+              formula="30,6 ÷ 0,701"
+              resultado="≈ 43,7 kg/d  [seria 47,4 kg/d com NRC 2001 → diferença de 3,7 kg/d]" />
           </div>
 
           {/* Comparação visual NRC 2001 vs 2021 */}
@@ -295,29 +319,29 @@ export default function Calculos() {
                 </tr>
                 <tr>
                   <td className="px-4 py-2 text-gray-600">NEL manutenção (680 kg)</td>
-                  <td className="px-4 py-2 text-gray-400 line-through">13,8 Mcal/d</td>
-                  <td className="px-4 py-2 font-bold text-amber-700">17,3 Mcal/d  (+3,5 Mcal/d)</td>
+                  <td className="px-4 py-2 text-gray-400 line-through">10,7 Mcal/d</td>
+                  <td className="px-4 py-2 font-bold text-amber-700">13,3 Mcal/d  (+2,6 Mcal/d)</td>
                 </tr>
                 <tr>
                   <td className="px-4 py-2 text-gray-600">NEL disponível para leite</td>
-                  <td className="px-4 py-2 text-gray-400 line-through">30,1 Mcal/d</td>
-                  <td className="px-4 py-2 font-bold text-amber-700">26,6 Mcal/d  (−3,5 Mcal/d)</td>
+                  <td className="px-4 py-2 text-gray-400 line-through">33,2 Mcal/d</td>
+                  <td className="px-4 py-2 font-bold text-amber-700">30,6 Mcal/d  (−2,6 Mcal/d)</td>
                 </tr>
                 <tr className="bg-amber-50">
                   <td className="px-4 py-2 font-semibold text-gray-700">Leite potencial NEL</td>
-                  <td className="px-4 py-2 text-gray-400 line-through">42,9 kg/d</td>
-                  <td className="px-4 py-2 font-bold text-amber-700">37,9 kg/d  (−5,0 kg/d)</td>
+                  <td className="px-4 py-2 text-gray-400 line-through">47,4 kg/d</td>
+                  <td className="px-4 py-2 font-bold text-amber-700">43,7 kg/d  (−3,7 kg/d)</td>
                 </tr>
               </tbody>
             </table>
           </div>
 
           <div className="mt-4 rounded-lg bg-amber-100 px-4 py-3 text-sm text-amber-800">
-            <strong>Interpretação:</strong> Com essa dieta, a energia da dieta suporta ~38 kg de leite/d.
-            Como a vaca produz 41 kg na realidade e o leite potencial pela energia é 37,9 kg/d,
-            a dieta está <strong>ligeiramente deficiente em energia</strong> — a vaca mobiliza reservas corporais para
-            complementar. Se o formulador mostrar o leite potencial por proteína maior que o energético,
-            a energia é o fator limitante da produção.
+            <strong>Interpretação:</strong> Com essa dieta, a energia suporta ~43,7 kg de leite/d.
+            Como o leite potencial pela proteína metabolizável é muito maior (~71,7 kg/d),
+            a <strong>energia é o fator limitante</strong> entre os dois nutrientes nesta dieta — há proteína em
+            abundância, mas a energia é o teto produtivo. Se a vaca viesse a produzir acima de 43,7 kg/d,
+            ela precisaria mobilizar reservas corporais para complementar a energia da dieta.
           </div>
         </div>
       </Secao>
@@ -440,8 +464,8 @@ export default function Calculos() {
               formula="2,448 + 1,423"
               resultado="= 3,871 kg PM/d" />
             <Passo n={5}  label="Esfoliação de pele (manutenção)"
-              formula="0,20 × 680^0,60 × 0,86 / 1000  =  0,172 × 79,8 / 1000"
-              resultado="= 0,014 kg NP/d" />
+              formula="0,20 × 680^0,60 × 0,86 / 1000  =  0,172 × 50,1 / 1000"
+              resultado="= 0,009 kg NP/d" />
             <Passo n={6}  label="Perdas urinárias endógenas (manutenção)"
               formula="0,053 × 680 × 6,25 / 1000"
               resultado="= 0,225 kg NP/d" />
@@ -449,23 +473,23 @@ export default function Calculos() {
               formula="0,73 × (12 + 0,12 × 40) × 25,5 / 1000  =  0,73 × 16,8 × 25,5 / 1000"
               resultado="= 0,313 kg NP/d" />
             <Passo n={8}  label="Total de manutenção proteica"
-              formula="0,014 + 0,225 + 0,313"
-              resultado="= 0,552 kg NP/d" />
+              formula="0,009 + 0,225 + 0,313"
+              resultado="= 0,547 kg NP/d" />
             <Passo n={9}  label="PM disponível para o leite"
-              formula="3,871 − 0,552"
-              resultado="= 3,319 kg PM/d" />
+              formula="3,871 − 0,547"
+              resultado="= 3,324 kg PM/d" />
             <Passo n={10} label="Proteína verdadeira do leite produzida (KlMP = 0,69)"
-              formula="3,319 × 0,69"
-              resultado="= 2,290 kg NP leite/d" />
+              formula="3,324 × 0,69"
+              resultado="= 2,294 kg NP leite/d" />
             <Passo n={11} label="Leite potencial pela proteína"
-              formula="2,290 ÷ (3,2 / 100)"
-              resultado="≈ 71,6 kg/d" />
+              formula="2,294 ÷ (3,2 / 100)"
+              resultado="≈ 71,7 kg/d" />
           </div>
           <div className="mt-3 rounded-lg bg-violet-100 px-4 py-2 text-sm text-violet-800">
-            <strong>Interpretação:</strong> Com essa dieta, a proteína metabolizável suportaria ~71,6 kg de leite/d.
-            Como o leite potencial pela <em>energia</em> é menor (~38 kg/d, calculado com NRC 2021),
-            a <strong>energia é o fator limitante</strong> — a vaca não consegue produzir mais porque falta energia,
-            não proteína. Quando o leite pela PM for o menor dos dois, dizemos que a proteína está limitando a produção.
+            <strong>Interpretação:</strong> Com essa dieta, a proteína metabolizável suportaria ~71,7 kg de leite/d.
+            Como o leite potencial pela <em>energia</em> é muito menor (~43,7 kg/d, calculado com NRC 2021),
+            a <strong>energia é o fator limitante</strong> — há proteína em excesso relativo à energia nessa dieta.
+            Quando o leite pela PM for o menor dos dois, dizemos que a proteína está limitando a produção.
           </div>
         </div>
 
