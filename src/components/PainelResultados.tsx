@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ChevronDown, ChevronRight, Info } from 'lucide-react';
+import { ChevronDown, ChevronRight } from 'lucide-react';
 import type { Referencia, ResultadoDieta } from '../types';
 import { getReferenciasLactacao, getStatus, statusColor, statusDot } from '../utils/referencias';
 import { formatarValor } from '../utils/calculos';
@@ -14,17 +14,6 @@ interface NutrienteRowProps {
   chave: string;
   valor: number;
   refs: Record<string, Referencia>;
-}
-
-function InfoTooltip({ texto }: { texto: string }) {
-  return (
-    <span className="relative group inline-flex items-center">
-      <Info size={14} className="text-gray-400 hover:text-gray-600 cursor-help ml-1 flex-shrink-0" />
-      <span className="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-2 w-96 bg-gray-800 text-white text-[13px] rounded-xl px-4 py-3 opacity-0 group-hover:opacity-100 transition-opacity z-[9999] leading-relaxed shadow-2xl whitespace-pre-line">
-        {texto}
-      </span>
-    </span>
-  );
 }
 
 function NutrienteRow({ chave, valor, refs }: NutrienteRowProps) {
@@ -129,23 +118,16 @@ export default function PainelResultados({ resultado, leite, precoLeite }: Props
     pctCMS < 95 ? 'bg-amber-400' :
     pctCMS <= 110 ? 'bg-emerald-500' : 'bg-orange-500';
 
-  // Faixa de produção para exibir no label PB/CNF
-  const faixaLeite = leite >= 30 ? '≥30L' : leite >= 20 ? '20–30L' : '<20L';
-
   return (
     <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm flex flex-col gap-3">
-      <h2 className="text-sm font-bold text-gray-700 flex items-center gap-2">
+      <h2 className="text-sm font-bold text-gray-700">
         📊 Resultados
-        <span className="text-xs font-normal text-gray-400 ml-1">refs. PB/CNF para {faixaLeite}</span>
       </h2>
 
       {/* CMS — barra de progresso */}
       <div className="bg-blue-50 border border-blue-200 rounded-xl p-3">
-        <div className="text-xs font-bold text-blue-700 mb-2 flex items-center">
+        <div className="text-base font-bold text-blue-700 mb-2">
           🥛 Consumo
-          <InfoTooltip texto={
-            "CMS exigida — NRC 2021\n\nEquação base (Eq. 4-1):\nCMS_base = [3,7 + (5,7×paridade) + (0,305×NEL_leite×leite) + (0,022×PV) + ((-0,689 − 1,87×paridade)×ECC)] × [1 − (0,212 + 0,136×paridade) × e^(−0,053×DEL)]\n\nLimitante físico de FDN:\nCMS_FDN = CMS_base ÷ (1 − 0,63 × FDN_dieta)\n\nAjuste pré-pico (DEL ≤ 21 dias):\nCMS = (0,52 + 0,024 × DEL) × CMS_FDN\n\nTeto biológico: máx 5% do PV\n\nOnde:\n• Paridade: 0 = novilha, 1 = vaca adulta\n• NEL_leite = 0,0929×gord% + 0,0563×prot% + 0,0395×lact%\n• PV = peso vivo (kg)\n• ECC = escore de condição corporal (1–5)\n• DEL = dias em lactação\n• FDN_dieta = proporção de FDN na MS da dieta"
-          } />
         </div>
         <div className="flex justify-between text-sm text-blue-700 mb-1 font-medium">
           <span>CMS formulada vs exigida</span>
@@ -162,29 +144,23 @@ export default function PainelResultados({ resultado, leite, precoLeite }: Props
 
       {/* Cards de leite potencial + custos */}
       <div className="grid grid-cols-2 gap-2">
-        <div className={`border rounded-xl p-2 text-center ${fator_limitante === 'energia' ? 'bg-emerald-100 border-emerald-400 ring-2 ring-emerald-400' : 'bg-emerald-50 border-emerald-200'}`}>
-          <div className="text-[11px] font-semibold text-emerald-700 mb-0.5 flex items-center justify-center">
+        <div className={`border rounded-xl p-3 text-center ${fator_limitante === 'energia' ? 'bg-emerald-100 border-emerald-400 ring-2 ring-emerald-400' : 'bg-emerald-50 border-emerald-200'}`}>
+          <div className="text-sm font-bold text-emerald-700 mb-1 leading-tight">
             ⚡ Leite Potencial para Energia
-            <InfoTooltip texto={
-              "Leite potencial por energia — NRC 2021\n\nEnergia disponível para lactação:\nNEL disponível = NEL total da dieta − mantença\nMantença = 0,08 × PV^0,75  Mcal/dia\n\nExigência energética por kg de leite (NRC 2021, Eq. 3-14):\nNEL/kg = 0,0929×gord% + 0,0563×prot% + 0,0395×lact%\n\nLeite potencial = NEL disponível ÷ NEL/kg leite\n\nInterpretação: produção máxima suportada pela energia da dieta, descontada a mantença."
-            } />
           </div>
-          <div className="text-xl font-bold text-emerald-800 tabular-nums leading-tight">
+          <div className="text-3xl font-bold text-emerald-800 tabular-nums leading-tight">
             {leite_potencial_nel.toFixed(1)}
           </div>
-          <div className="text-[11px] text-emerald-600">kg/dia</div>
+          <div className="text-xs text-emerald-600 mt-0.5">kg/dia</div>
         </div>
-        <div className={`border rounded-xl p-2 text-center ${fator_limitante === 'proteina' ? 'bg-violet-100 border-violet-400 ring-2 ring-violet-400' : 'bg-violet-50 border-violet-200'}`}>
-          <div className="text-[11px] font-semibold text-violet-700 mb-0.5 flex items-center justify-center">
+        <div className={`border rounded-xl p-3 text-center ${fator_limitante === 'proteina' ? 'bg-violet-100 border-violet-400 ring-2 ring-violet-400' : 'bg-violet-50 border-violet-200'}`}>
+          <div className="text-sm font-bold text-violet-700 mb-1 leading-tight">
             🧬 Leite Potencial para Proteína
-            <InfoTooltip texto={
-              "Leite potencial por proteína — NRC 2021\n\nUsa Proteína Metabolizável (PM): proteína que chega ao intestino.\n\nFontes de PM:\n• MP de PNDR = PNDR × 0,80  (digestibilidade intestinal)\n• MP microbiana = NDT(kg) × 1000 × 0,13 × 0,64\n  (130 g MCP/kg NDT × 64% de digestibilidade)\n\nMP total = MP de PNDR + MP microbiana\n\nDesconto de mantença proteica (NRC 2021, Cap. 4):\nMP mantença = 3,8 × PV^0,75  (g/dia)\nMP para leite = MP total − MP mantença\n\nLeite potencial = MP para leite ÷ (prot_leite% × 10 ÷ 0,67)\n\nO 0,67 é a eficiência de uso da PM para síntese de proteína do leite.\nO 3,8 × PV^0,75 cobre perdas endógenas (urinária + fecal + tegumentar)."
-            } />
           </div>
-          <div className="text-xl font-bold text-violet-800 tabular-nums leading-tight">
+          <div className="text-3xl font-bold text-violet-800 tabular-nums leading-tight">
             {leite_potencial_prot.toFixed(1)}
           </div>
-          <div className="text-[11px] text-violet-600">kg/dia</div>
+          <div className="text-xs text-violet-600 mt-0.5">kg/dia</div>
         </div>
       </div>
 

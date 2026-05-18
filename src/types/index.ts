@@ -55,7 +55,12 @@ export interface Alimento {
   fat_digest: number | null;
   lisina_pct: number | null;
   met_pct: number | null;
+  ivndfd48?: number | null;       // Digestibilidade in vitro FDN 48h, % do FDN — NASEM 2021
+  fonte_nasem?: string | null;    // Nome original NASEM (rastreabilidade)
+  alimento_base?: string | null;  // Nome PT-BR do alimento clonado como base (rastreabilidade)
 }
+
+export type Raca = 'Holstein' | 'Jersey' | 'Outra';
 
 export interface AnimalLactacao {
   ecc: number;
@@ -67,6 +72,11 @@ export interface AnimalLactacao {
   proteina: number;
   lactose: number;
   precoLeite: number;
+  // Gestação (NASEM 2021 Eq. 20-225 a 20-239) — campos novos, opcionais para compat
+  raca?: Raca;
+  dias_gestacao?: number;           // 0 = não prenhe (default 0)
+  peso_bezerro_alvo?: number;       // kg ao nascimento (default por raça)
+  gestacao_total?: number;          // dias totais de gestação (default 280)
 }
 
 export interface SlotIngrediente {

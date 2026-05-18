@@ -20,7 +20,22 @@ const ANIMAL_PADRAO: AnimalLactacao = {
   proteina: 3.2,
   lactose: 4.7,
   precoLeite: 2.20,
+  raca: 'Holstein',
+  dias_gestacao: 0,
+  peso_bezerro_alvo: 45,
+  gestacao_total: 280,
 };
+
+/** Preenche valores default em animais carregados de dietas antigas (legacy). */
+function normalizarAnimal(a: AnimalLactacao): AnimalLactacao {
+  return {
+    ...a,
+    raca: a.raca ?? 'Holstein',
+    dias_gestacao: a.dias_gestacao ?? 0,
+    peso_bezerro_alvo: a.peso_bezerro_alvo ?? (a.raca === 'Jersey' ? 28 : 45),
+    gestacao_total: a.gestacao_total ?? 280,
+  };
+}
 
 const SLOTS_PADRAO = 8;
 
@@ -44,7 +59,7 @@ function dietaNova(): Dieta {
     id: gerarId(),
     nome: 'Nova Dieta',
     criadaEm: new Date().toISOString(),
-    animal: ANIMAL_PADRAO,
+    animal: { ...ANIMAL_PADRAO },
     slots: criarSlots(),
   };
 }
@@ -107,9 +122,14 @@ export function DietaProvider({ children }: { children: ReactNode }) {
           .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
         setAlimentos(merged);
 
-        setDietas(dietasDB);
-        if (dietasDB.length > 0) {
-          setDieta({ ...dietasDB[0], slots: normalizarSlots(dietasDB[0].slots) });
+        // Backfill defaults nos campos novos do animal (compat com dietas antigas)
+        const dietasNormalizadas = dietasDB.map(d => ({
+          ...d,
+          animal: normalizarAnimal(d.animal),
+        }));
+        setDietas(dietasNormalizadas);
+        if (dietasNormalizadas.length > 0) {
+          setDieta({ ...dietasNormalizadas[0], slots: normalizarSlots(dietasNormalizadas[0].slots) });
         }
       } catch (err) {
         console.error('Erro ao inicializar dados:', err);
@@ -146,7 +166,7 @@ export function DietaProvider({ children }: { children: ReactNode }) {
   const carregarDieta = useCallback((id: string) => {
     setDietas(prev => {
       const d = prev.find(x => x.id === id);
-      if (d) setDieta({ ...d, slots: normalizarSlots(d.slots) });
+      if (d) setDieta({ ...d, animal: normalizarAnimal(d.animal), slots: normalizarSlots(d.slots) });
       return prev;
     });
   }, []);

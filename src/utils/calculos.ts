@@ -118,7 +118,12 @@ export function calcularResultados(
   let kgBIOTINA = 0, kgMONENSINA = 0, kgCR = 0, kgLEVEDURA = 0;
   let kgFDN8 = 0;
   let kgMS_forragem = 0;
+  let kgMN_forragem = 0;   // necessário para Dt_ForWet (Eq. 20-52/53)
   let custoTotal = 0;
+
+  // NASEM 2021 — Frações proteicas (Eq. 6-1) e Michaelis-Menten (Eq. 20-74)
+  let An_idRUPIn = 0;  // kg/d — RUP digerível (entra na MP)
+  let An_RDPIn   = 0;  // kg/d — proteína degradada no rúmen
 
   for (const slot of slots) {
     if (!slot.alimentoNome || slot.kgMN <= 0) continue;
@@ -135,12 +140,47 @@ export function calcularResultados(
 
     const nel = calcularNelAlimento(a);
     const cnf = calcularCNFAlimento(a);
-    const pndr = a.pndr ?? 0;
-    const pdr = a.pb - pndr;
+
+    // ── NASEM 2021 — RUP/RDP via frações proteicas (Eq. 6-1) ──────────────
+    // ATENÇÃO: calcularTaxasPassagem retorna kPx em DECIMAL/h (ex.: 0.031 = 3.1%/h)
+    // Mas a.kd_prot está em %/h. Para o competidor de Eq. 6-1 dar valores corretos
+    // ambos precisam estar em %/h → multiplicar kP por 100.
+    const kP_pct = (a.tipo === 'F' ? kPf : kPc) * 100;  // %/h
+    let kgRUP_f = 0;
+    let kgRDP_f = 0;
+    let idRUP_f = 0;
+
+    if (a.prot_a !== null && a.prot_b !== null && a.prot_c !== null && a.kd_prot !== null) {
+      const fracA = a.prot_a / 100;
+      const fracB = a.prot_b / 100;
+      const fracC = a.prot_c / 100;
+      const kd    = a.kd_prot;  // %/h
+
+      // Fração B compete entre degradação (kd) e passagem (kP), ambos em %/h
+      const rupB = fracB * (kP_pct / (kd + kP_pct));
+      const rupC = fracC;        // 100% escapa (ligada à FDA, indegradável)
+      const rdpA = fracA;        // 100% degrada
+      const rdpB = fracB * (kd / (kd + kP_pct));
+
+      kgRUP_f = a.pb * kgMS * (rupB + rupC);
+      kgRDP_f = a.pb * kgMS * (rdpA + rdpB);
+
+      // Digestibilidade intestinal do RUP (Eq. 20-123/124) — fallback 0,80
+      const dcRUP = a.rup_digest !== null
+        ? a.rup_digest
+        : (() => { console.warn(`[NASEM] rup_digest ausente para "${a.nome}". Usando fallback 0.80.`); return 0.80; })();
+
+      idRUP_f = kgRUP_f * dcRUP;
+    } else if (a.pb > 0) {
+      console.warn(`[NASEM] Frações proteicas ausentes para "${a.nome}". RUP/RDP não calculados.`);
+    }
+
+    An_idRUPIn += idRUP_f;
+    An_RDPIn   += kgRDP_f;
 
     kgPB += a.pb * kgMS;
-    kgPDR += pdr * kgMS;
-    kgPNDR += pndr * kgMS;
+    kgPDR += kgRDP_f;
+    kgPNDR += kgRUP_f;
     kgFDN += (a.fdn ?? 0) * kgMS;
     kgEFDN += calcularEFDNAlimento(a, kgMS);
     kgFDNF += a.tipo === 'F' ? (a.fdn ?? 0) * kgMS : 0;
@@ -152,9 +192,12 @@ export function calcularResultados(
     kgCNF += cnf * kgMS;
 
     const amido = a.amido ?? 0;
-    const kd_amido = a.kd_amido ?? 0;
+    const kd_amido = a.kd_amido ?? 0;  // %/h (mesma unidade que kP_pct)
+    const kPc_pct = kPc * 100;          // converte decimal/h → %/h
     kgAMIDO += amido * kgMS;
-    kgAMIDO_DEG += kPc > 0 ? (kd_amido / (kd_amido + kPc)) * amido * kgMS : 0;
+    kgAMIDO_DEG += kPc_pct > 0 && kd_amido > 0
+      ? (kd_amido / (kd_amido + kPc_pct)) * amido * kgMS
+      : 0;
 
     kgMET += (a.met ?? 0) * kgMS;
     kgLYS += (a.lys ?? 0) * kgMS;
@@ -181,7 +224,10 @@ export function calcularResultados(
     kgLEVEDURA += (a.levedura ?? 0) * kgMS;
     kgFDN8 += calcularFDN8(a, kgMS);
 
-    if (a.tipo === 'F') kgMS_forragem += kgMS;
+    if (a.tipo === 'F') {
+      kgMS_forragem += kgMS;
+      kgMN_forragem += kgMN;
+    }
   }
 
   const ms = totalKgMS || 1;
@@ -197,24 +243,143 @@ export function calcularResultados(
   const nel_por_kg_leite = 0.0929 * animal.gordura + 0.055 * animal.proteina + 0.0395 * animal.lactose;
   const leite_potencial_nel = nel_por_kg_leite > 0 ? Math.max(0, nelDisponivel / nel_por_kg_leite) : 0;
 
-  // ── Leite potencial pela proteína — NRC 2021 (Proteína Metabolizável) ──────
-  // An_MPIn = digestível RUP + proteína verdadeira microbiana digestível
-  // Du_idMiTP = Du_MiCP × 0.80 × 0.824 (NRC 2021 Eq. 20-135 × Eq. 20-127)
-  const mp_rup    = kgPNDR * 0.80;
-  const mp_mcp    = kgNDT  * 0.13 * 0.80 * 0.824;
-  const mp_total  = mp_rup + mp_mcp;
+  // ── Proteína Microbiana — Michaelis-Menten (NASEM 2021 Eq. 20-74/75/76) ─────
+  // Parâmetros fixos (Eq. 20-75)
+  const MiN_VmInt    = 100.8;   // g/d — intercepto
+  const MiN_VmRDPSlp = 81.56;   // g/d por kg de RDP
+  const MiN_KmrdNDF  = 0.0939;  // constante MM para NDF ruminal
+  const MiN_KmrdSt   = 0.0274;  // constante MM para amido ruminal
 
-  // Manutenção NP (NRC 2021 Eq. 20-283/285, 20-294/295, 20-300/302)
-  const Scrf_NP  = 0.20 * Math.pow(animal.peso, 0.60) * 0.86 / 1000;
-  const Ur_NPend = 0.053 * animal.peso * 6.25 / 1000;
+  // RDP cap em 12% da MS (NASEM 2021, Cap. 6)
+  const rdp_pct_dieta = totalKgMS > 0 ? (An_RDPIn / totalKgMS) * 100 : 0;
+  const An_RDPIn_efetivo = rdp_pct_dieta > 12 ? 0.12 * totalKgMS : An_RDPIn;
+
+  // Vm de síntese microbiana (Eq. 20-75)
+  const MiN_Vm = MiN_VmInt + MiN_VmRDPSlp * An_RDPIn_efetivo;
+
+  // ── NASEM 2021 — Rum_dcNDF e Rum_dcSt (Eq. 20-52, 20-53) ────────────────
+  // Equações diet-level oficiais para digestibilidade ruminal de NDF e amido.
+  // Substituem a aproximação anterior (ivndfd48 ajustado direto + kd/(kd+kP)).
+  // ivndfd48 NÃO é input destas equações — entra apenas em Total Tract NDF
+  // (Eq. 20-115), que não é usado na Michaelis-Menten.
+  let Rum_DigNDFIn = 0;
+  let Rum_DigStIn  = 0;
+  if (totalKgMS > 0) {
+    const NDF_pct = (kgFDN / totalKgMS) * 100;     // % MS
+    const St_pct  = (kgAMIDO / totalKgMS) * 100;
+    const CP_pct  = (kgPB / totalKgMS) * 100;
+    const ForNDF_pct = (kgFDNF / totalKgMS) * 100; // % FDN forragem na MS
+    const ForWet_pct = totalKgMN > 0 ? (kgMN_forragem / totalKgMN) * 100 : 0;
+    const ADF_div_NDF_pct = kgFDN > 0 ? (kgFDA / kgFDN) * 100 : 0;
+
+    // Eq. 20-52 — Rum_dcNDF em %
+    const Rum_dcNDF = -31.9
+      + 0.721  * NDF_pct
+      - 0.247  * St_pct
+      + 6.63   * CP_pct
+      - 0.211  * CP_pct * CP_pct
+      - 0.387  * ADF_div_NDF_pct
+      - 0.121  * ForWet_pct
+      + 1.51   * totalKgMS;
+
+    // Eq. 20-53 — Rum_dcSt em %
+    const Rum_dcSt = 70.6
+      - 1.45   * totalKgMS
+      + 0.424  * ForNDF_pct
+      + 1.39   * St_pct
+      - 0.0219 * St_pct * St_pct
+      - 0.154  * ForWet_pct;
+
+    // Eq. 20-54 e 20-55 — bounded em [0, 100] para consistência biológica
+    const Rum_dcNDF_bound = Math.min(100, Math.max(0, Rum_dcNDF));
+    const Rum_dcSt_bound  = Math.min(100, Math.max(0, Rum_dcSt));
+
+    Rum_DigNDFIn = (Rum_dcNDF_bound / 100) * kgFDN;
+    Rum_DigStIn  = (Rum_dcSt_bound  / 100) * kgAMIDO;
+  }
+
+  // Equação de Michaelis-Menten (Eq. 20-74) com proteção contra divisão por zero
+  let Du_MiCP   = 0;
+  let Du_idMiTP = 0;
+  if (Rum_DigNDFIn > 0 || Rum_DigStIn > 0) {
+    const denom = 1
+      + (Rum_DigNDFIn > 0 ? MiN_KmrdNDF / Rum_DigNDFIn : 0)
+      + (Rum_DigStIn  > 0 ? MiN_KmrdSt  / Rum_DigStIn  : 0);
+    const Du_MiN_g = MiN_Vm / denom;                  // g N/d
+    Du_MiCP        = Du_MiN_g * 6.25 / 1000;          // kg/d (Eq. 20-76)
+    const Du_idMiCP = Du_MiCP * 0.80;                  // kg/d (Eq. 20-126)
+    Du_idMiTP       = Du_idMiCP * 0.824;               // kg/d (Eq. 20-127)
+  }
+
+  // MP total disponível (Eq. 20-136): MP = idRUP + idMiTP
+  const An_MPIn = An_idRUPIn + Du_idMiTP;
+
+  // ── Manutenção proteica (NASEM 2021 Eq. 20-283 a 20-305) ─────────────────
+  // Scurf (Eq. 20-283/284/285)
+  const Scrf_NP  = (0.20 * Math.pow(animal.peso, 0.60) * 0.86) / 1000;     // kg/d
+  // Urinária endógena (Eq. 20-294/295/296) — já em MP equivalente (eff = 1)
+  const Ur_NPend = (0.053 * animal.peso * 6.25) / 1000;                    // kg/d
+  // Fecal endógena (Eq. 20-300/302)
   const fdn_pct  = totalKgMS > 0 ? (kgFDN / totalKgMS) * 100 : 0;
-  const Fe_NPend = totalKgMS > 0 ? 0.73 * (12.0 + 0.12 * fdn_pct) * totalKgMS / 1000 : 0;
-  const mp_mantenca = Scrf_NP + Ur_NPend + Fe_NPend;
+  const Fe_CPend = (12.0 + 0.12 * fdn_pct) * totalKgMS / 1000;             // kg/d
+  const Fe_NPend = Fe_CPend * 0.73;                                         // 73% TP (Eq. 20-302)
 
-  const mp_para_leite = Math.max(0, mp_total - mp_mantenca);
-  // KlMP_NP,Trg = 0.69 (NRC 2021 Eq. 20-214)
-  const leite_potencial_prot = animal.proteina > 0
-    ? Math.max(0, mp_para_leite * 0.69 / (animal.proteina / 100))
+  // Conversão NP→MP: Scurf e fecal usam KmMP_NP = 0.69 (Eq. 20-305/306)
+  // Urinária é direta (eff = 1)
+  const KmMP_NP = 0.69;
+  const mp_mantenca = (Scrf_NP + Fe_NPend) / KmMP_NP + Ur_NPend;          // kg/d
+
+  // ── Gestação proteica — Gest_MPuse (NASEM 2021 Eq. 20-225 a 20-239) ──────
+  // Calcula MP consumida pelo crescimento do útero grávido. Subtrai de
+  // An_MPavailMilk junto com a manutenção.
+  //
+  // Parâmetros do modelo exponencial Koong (1975), Tabela 20-10:
+  //   K_GrUterSyn     = 2,43×10⁻²
+  //   K_GrUterSynDecay = 2,45×10⁻⁵
+  //   GrUter:Fetus ratio (parto) = 1,816 kg/kg (gestação de 280 d)
+  //
+  // Modelo: GrUter_Wt(t) = GrUter_Wt_parto × exp(−(Ks − Kd × t) × (T − t))
+  // Derivada: GrUter_WtGain = GrUter_Wt × (Ks + Kd × T − 2 × Kd × t)
+  const dias_gest    = animal.dias_gestacao ?? 0;
+  const peso_bez     = animal.peso_bezerro_alvo ?? (animal.raca === 'Jersey' ? 28 : 45);
+  const T_gest       = animal.gestacao_total ?? 280;
+  let Gest_MPuse = 0;
+  if (dias_gest > 0 && dias_gest <= T_gest) {
+    const K_GrUterSyn      = 2.43e-2;
+    const K_GrUterSynDecay = 2.45e-5;
+    const fGrUter_Fetus    = 1.816;       // Eq. 20-225 (LengthGest = 280)
+    const GrUter_Wt_parto  = peso_bez * fGrUter_Fetus;
+
+    // Eq. 20-227 — peso do útero grávido no dia DayGest
+    const expoente = -(K_GrUterSyn - K_GrUterSynDecay * dias_gest) * (T_gest - dias_gest);
+    const GrUter_Wt = GrUter_Wt_parto * Math.exp(expoente);
+
+    // Derivada analítica → ganho diário (Eq. 20-233)
+    const GrUter_WtGain = GrUter_Wt
+      * (K_GrUterSyn + K_GrUterSynDecay * T_gest - 2 * K_GrUterSynDecay * dias_gest);
+
+    // Eq. 20-235 — Gest_NPgain (g/d), com 123 g NP/kg e fator escala 0,86
+    const Gest_NPgain_g = GrUter_WtGain * 123 * 0.86;
+
+    // Eq. 20-238/239 — KyMP_NP = 0,33 (gestação positiva)
+    const KyMP_NP = 0.33;
+    Gest_MPuse = (Gest_NPgain_g / KyMP_NP) / 1000;   // converte g → kg
+  }
+
+  // ── Leite potencial pela proteína (NASEM 2021 Eq. 20-339 derivada) ───────
+  // A Eq. 20-339 do PDF está impressa como divisão por KlMP, mas a derivação
+  // da Eq. 20-212 (Mlk_MPuse = Mlk_NP / KlMP) e a validação da Tabela 20-16
+  // (observado 30.9 vs previsto 32.6 kg/d) indicam que KlMP deve estar no
+  // numerador. Logo: leite = An_MPavailMilk × KlMP / (Trg_MilkTPp/100)
+  //
+  // OMISSÃO INTENCIONAL restante (vs Eq. 20-337 NASEM completa):
+  //   - Body_MPuse  (Eq. 20-270): requer An_NPgain (ECC alvo vs atual). Para
+  //     vacas em ECC estável (foco do app), ≈ 0. Documentado em /calculos.
+  const An_MPavailMilk = Math.max(0, An_MPIn - mp_mantenca - Gest_MPuse);
+  const KlMP_NP_Trg    = 0.69;
+  const Trg_MilkTPp    = animal.proteina * 0.94;  // CP%→TP% (NASEM Cap. 3)
+  const leite_potencial_prot = Trg_MilkTPp > 0
+    ? Math.max(0, An_MPavailMilk * KlMP_NP_Trg / (Trg_MilkTPp / 100))
     : 0;
 
   // ── Fator limitante — mínimo entre energia e proteína ──────────────────────
