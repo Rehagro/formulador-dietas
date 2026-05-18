@@ -1,5 +1,5 @@
 # Plano de Desenvolvimento — Formulador de Dietas
-**Rehagro · NRC 2021 · Atualizado em: 2026-05-11**
+**Rehagro · NASEM 2021 · Atualizado em: 2026-05-18**
 
 ---
 
@@ -219,7 +219,7 @@ Fase 0 (base)
 
 | Fase | Descrição | Status | Última atualização |
 |---|---|---|---|
-| Lactação | Motor NRC 2021 completo | ✅ Concluído | 2026-05-11 |
+| Lactação | Motor NASEM 2021 (PM completo + Gestação) | 🟡 Quase completo (falta Body_MPuse + Energia) | 2026-05-18 |
 | Fase 0 | Refatoração arquitetural (abas) | ⬜ Não iniciado | — |
 | Fase 1 | Vaca Seca | ⬜ Não iniciado | — |
 | Fase 2 | Pré-parto / Close-up | ⬜ Não iniciado | — |
@@ -228,6 +228,21 @@ Fase 0 (base)
 | Fase 5 | Bezerros | ⬜ Não iniciado | — |
 | Fase 6 | Otimização de custo | ⬜ Não iniciado | — |
 | Fase 7 | Comparação avançada | ⬜ Não iniciado | — |
+
+### Lactação — Pendências para 100% NASEM 2021
+Ver `GAP_ANALYSIS_NASEM2021.md` para detalhamento completo equação-por-equação.
+
+1. **Cadeia de Energia (DE → ME → NEL)** — *prioridade crítica*
+   - JSON NASEM não traz `nel`/`ndt` em nenhum dos 159 alimentos
+   - Eq. 20-170 (GE), 20-182 (DE), 20-307 (ME), 20-310 (GasE/CH4), 20-268 (Kl_ME=0,66)
+   - Card "Leite Potencial Energia" zerado até resolver
+   - Esforço estimado: 2 dias
+
+2. **Body_MPuse (ganho/perda corporal proteico)** — *prioridade baixa*
+   - Eq. 20-247/258/270 — requer ECC alvo + dias para alvo
+   - Impacto: superestima ~2–4 kg/d para vaca em ganho ativo
+   - Para vaca em ECC estável (DEL ≥ 60d), impacto = 0
+   - Esforço estimado: 1 dia
 
 ---
 
