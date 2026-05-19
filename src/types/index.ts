@@ -30,6 +30,11 @@ export interface Alimento {
   wsc?: number | null;              // % MS — carboidratos solúveis em água
   de_base?: number | null;          // Mcal/kg MS — DE base NASEM Tabela 19-1
   mo?: number | null;               // mg/kg MS — Molibdênio
+  // Cadeia de energia NASEM 2021 (fix Fase 1)
+  fa?: number | null;               // % MS — Fd_FA (ácidos graxos verdadeiros, ≠ EE)
+  dc_st?: number | null;            // % — Fd_dcSt (digestibilidade do amido por alimento)
+  dc_fa?: number | null;            // % — Fd_dcFA (digestibilidade FA, Tabela 4-1)
+  npn_frac?: number | null;         // fração 0-1 do PB que é NPN (Ureia=1, demais ~0)
   // PSPS (Penn State Particle Separator) — não usado no motor NASEM 2021, mas mantido
   // por valor pedagógico (alunos veem em outras referências). Null por padrão.
   mn8?: number | null;              // Fração FDN > 8mm (mn8/mn19 do PSPS)
@@ -87,6 +92,16 @@ export interface AnimalLactacao {
   dias_gestacao?: number;           // 0 = não prenhe (default 0)
   peso_bezerro_alvo?: number;       // kg ao nascimento (default por raça)
   gestacao_total?: number;          // dias totais de gestação (default 280)
+  // Composição corporal (NASEM 2021 Eq. 20-247/258/270 — Fase 5)
+  // Necessário para ganho de frame (primípara crescendo) e ECC (reserva).
+  peso_maduro?: number;             // kg (default 700 Holstein / 500 Jersey)
+  ganho_frame_kg_dia?: number;      // Trg_FrmGain (default 0 — multípara madura)
+  ganho_reserva_kg_dia?: number;    // Trg_RsrvGain (default 0 — ECC estável)
+  // Método de cálculo de dcNDF (NASEM 2021 Use_DNDF_IV switch — Fase 2.1)
+  //   'lignin'    = Eq. 20-112 (lignina, default NASEM oficial)
+  //   'iv_forage' = Eq. 20-111 (IVNDFD48) só forragens; lignina nos concentrados
+  //   'iv_all'    = Eq. 20-111 (IVNDFD48) para todos os alimentos
+  ndf_method?: 'lignin' | 'iv_forage' | 'iv_all';
 }
 
 export interface SlotIngrediente {

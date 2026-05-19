@@ -352,18 +352,33 @@ Leite_NEL = (An_NEIn − NEm) ÷ NEL_por_kg                  [kg/d]`}
             <li><strong>Fração C</strong> — ligada à FDA, indigestível: 100% escapa, mas não é digerida no intestino</li>
           </ul>
           <Formula>
-{`# Para cada alimento i:
-RUP_i  =  PB_i × kgMS_i × [ B × kP/(kd+kP)  +  C ]
-RDP_i  =  PB_i × kgMS_i × [ A             +  B × kd/(kd+kP) ]
+{`# Para cada alimento i (Eq. 6-1 NASEM 2021):
+RUP_i  =  (CP_A_i − NPN_A_i) × fCPAdu        ← fração A: 6,4% escapa
+       +  CP_B_i × kP/(kd+kP)                ← fração B: competição
+       +  CP_C_i                              ← fração C: 100% escapa
+       +  IntRUP/refCPIn × CP_i               ← intercepto da regressão
+
+RDP_i  =  CP_i × kgMS_i − RUP_i
 idRUP_i = RUP_i × digestibilidade_intestinal_RUP  (rup_digest)
 
 # Acumulado da dieta
 An_idRUPIn = Σ idRUP_i      [kg/d]
 An_RDPIn   = Σ RDP_i        [kg/d]   (capado em 12% da MS total)`}
           </Formula>
-          <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 mt-2 text-xs text-gray-600">
-            <strong>kd e kP em %/h.</strong> kd vem do banco de alimentos (NASEM). kP é a taxa de passagem ruminal calculada
-            pela função <code>calcularTaxasPassagem</code> em função do <code>% PV</code> de forragem e concentrado da dieta.
+          <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 mt-2 text-xs text-gray-600 space-y-1">
+            <p>
+              <strong>Constantes NASEM 2021 (lactação):</strong> fCPAdu = 0,064 — 6,4% da fração A escapa intacta;
+              IntRUP = −0,086 e refCPIn = 3,39 — intercepto da regressão Fd_RUPIn (corrige superestimativa em altas CP).
+            </p>
+            <p>
+              <strong>Taxas de passagem:</strong> kPf = 4,87%/h (forragens), kPc = 5,28%/h (concentrados), <em>fixos</em>.
+              Diferente do NRC 2001 (Eq. 20-25/26/27 dependentes de % PV), o NASEM 2021 abandonou essa equação por excesso de ruído experimental.
+              kd vem do banco (NASEM Tabela 19-1).
+            </p>
+            <p>
+              <strong>Para outras categorias</strong> (vaca seca, recria, bezerro): a arquitetura do motor já tem
+              <code> RUMEN_PARAMS </code>preparado para receber valores diferentes — basta implementar a função análoga.
+            </p>
           </div>
         </div>
 

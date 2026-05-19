@@ -11,6 +11,8 @@ import fs from 'node:fs';
 const atual = JSON.parse(fs.readFileSync('./src/data/alimentos.json', 'utf8'));
 const nasem = JSON.parse(fs.readFileSync('C:/Users/rasaf/nasem_t191.json', 'utf8'));
 const aa    = JSON.parse(fs.readFileSync('C:/Users/rasaf/nasem_t192_aa.json', 'utf8'));
+// Enriquecimento Fase 1: dc_st, npn_cp, dc_fa, Fd_FA do CSV oficial NASEM
+const extra = JSON.parse(fs.readFileSync('C:/Users/rasaf/nasem_t191_extra.json', 'utf8'));
 
 // Normaliza nomes para match (case-insensitive, remove pontuação especial)
 function normalizar(s) {
@@ -62,6 +64,7 @@ const MAPEAMENTO = [
   ['starch',      'amido',           'frac'],
   ['wsc',         'wsc',             'frac'],
   ['ee',          'ee',              'frac'],
+  ['tfas',        'fa',              'frac'],  // Fd_FA — ácidos graxos verdadeiros
   ['de_base',     'de_base',         'mcal'],
   ['ca',          'ca',              'frac'],
   ['p',           'p',               'frac'],
@@ -165,6 +168,18 @@ const novo = atual.map(a => {
   if (reescrito.de_base !== null && reescrito.de_base !== undefined) {
     const ndt = reescrito.de_base / 4.409;
     if (ndt >= 0 && ndt <= 1.2) reescrito.ndt = parseFloat(ndt.toFixed(6));
+  }
+
+  // ── Enriquecimento CSV NASEM (Fase 1) — dc_st, npn_frac, dc_fa ──────────
+  // Estes 3 campos não estão na T19-1 impressa, vêm do feed library oficial.
+  const extraRec = nasemRec.nrc_id ? extra[nasemRec.nrc_id] : null;
+  if (extraRec) {
+    if (extraRec.dc_st  !== undefined) reescrito.dc_st    = extraRec.dc_st;
+    if (extraRec.dc_fa  !== undefined) reescrito.dc_fa    = extraRec.dc_fa;
+    if (extraRec.npn_cp !== undefined) reescrito.npn_frac = parseFloat((extraRec.npn_cp / 100).toFixed(4));
+    if (extraRec.fa !== undefined && extraRec.fa !== null) {
+      reescrito.fa = parseFloat((extraRec.fa / 100).toFixed(6));
+    }
   }
 
   // Demais campos (efdn, kd_amido, met, lys, mn8, mn19, vit, etc.) ficam null

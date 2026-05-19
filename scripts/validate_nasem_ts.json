@@ -1,0 +1,105 @@
+{
+  "inputs": {
+    "animal": {
+      "ecc": 3,
+      "paridade": 0,
+      "peso": 624.795,
+      "del": 100,
+      "leite": 25.062,
+      "gordura": 4.55,
+      "proteina": 3.893617021276596,
+      "lactose": 4.85,
+      "precoLeite": 0,
+      "raca": "Holstein",
+      "dias_gestacao": 46,
+      "peso_bezerro_alvo": 44.1,
+      "gestacao_total": 280
+    },
+    "slots": [
+      {
+        "id": "slot-1",
+        "alimentoNome": "Alfalfa meal",
+        "kgMN": 9.047103549350407
+      },
+      {
+        "id": "slot-2",
+        "alimentoNome": "Canola meal",
+        "kgMN": 7.553551072614667
+      },
+      {
+        "id": "slot-3",
+        "alimentoNome": "Corn grain HM, coarse grind",
+        "kgMN": 5.68043228582894
+      },
+      {
+        "id": "slot-4",
+        "alimentoNome": "Corn silage, typical",
+        "kgMN": 15.478742117021579
+      }
+    ],
+    "alimentos_count": 4
+  },
+  "Dt_DMIn": 24.521001,
+  "Total_kgMN": 37.75982902481559,
+  "CMS_predita_Eq20_21": 21.687874980329017,
+  "Dt_CP_pct": 21.069958125445204,
+  "Dt_NDF_pct": 33.03968753486043,
+  "Dt_ADF_pct": 22.948671797493095,
+  "Dt_St_pct": 20.254262912839486,
+  "Dt_CFat_pct": 3.0018348416526717,
+  "Dt_DE_Mcal_kg": 3.1247335299951047,
+  "Dt_ME_Mcal_kg": 2.4936631545390804,
+  "Dt_NEL_Mcal_kg": 1.645817681995793,
+  "An_DEIn_calc": 76.62159401374349,
+  "An_MEIn_calc": 61.14711670611594,
+  "An_NEIn_calc": 40.35709702603652,
+  "Mlk_Prod_NEalow_TS": 33.630535150399325,
+  "Mlk_Prod_MPalow_TS": 38.428925351681094,
+  "Mlk_Prod_final_TS": 33.630535150399325,
+  "fator_limitante": "energia",
+  "debug_energia": {
+    "totalKgMS": 24.521001,
+    "kgFDN": 8.10166211082,
+    "kgAMIDO": 4.9665480114,
+    "kgEE": 0.7360799515399999,
+    "kgPB": 5.166564642639999,
+    "kgCinza": 1.7625761052000002,
+    "Dt_dcNDF_Base": 0.42528866465928816,
+    "Dt_dcNDF": 0.45451739158555593,
+    "Dt_DigNDFIn_Base": 3.4455450606313875,
+    "Dt_DigNDFIn": 3.6823463301174355,
+    "Dt_DigStIn": 4.569224170488,
+    "Dt_DigFAIn": 0.5373383646242,
+    "Fe_CPend": 0.39147195732983997,
+    "kgROM": 3.7875701783999993,
+    "Dt_DigrOMIn": 3.6398549414423993,
+    "Ur_DEIn": 8.69273979845773,
+    "An_GasEOut": 6.781737509169817,
+    "perFeedNDF": [
+      {
+        "feed": "Alfalfa meal",
+        "Fd_dcNDF_base": 0.41949169999999997,
+        "kgFDN_feed": 3.51829815068,
+        "kgFDN_dig": 1.4758968723356094
+      },
+      {
+        "feed": "Canola meal",
+        "Fd_dcNDF_base": 0.4212119,
+        "kgFDN_feed": 1.9496824784000002,
+        "kgFDN_dig": 0.821229461123573
+      },
+      {
+        "feed": "Corn grain HM, coarse grind",
+        "Fd_dcNDF_base": 0.4304778,
+        "kgFDN_feed": 0.39334857396,
+        "kgFDN_dig": 0.1693278287514381
+      },
+      {
+        "feed": "Corn silage, typical",
+        "Fd_dcNDF_base": 0.4370292,
+        "kgFDN_feed": 2.2403329077799996,
+        "kgFDN_dig": 0.979090898420767
+      }
+    ]
+  }
+}

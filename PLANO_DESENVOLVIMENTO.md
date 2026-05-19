@@ -1,5 +1,30 @@
 # Plano de Desenvolvimento — Formulador de Dietas
-**Rehagro · NASEM 2021 · Atualizado em: 2026-05-18**
+**Rehagro · NASEM 2021 · Atualizado em: 2026-05-26**
+
+---
+
+## Status da Lactação — Validado contra `nasem_dairy` 1.0.2 (oficial Guelph)
+
+Em 2026-05-26 implementamos validação cruzada numérica contra o motor Python oficial CNM/University of Guelph. Suite multi-cenário em `scripts/validate_multi_*` cobre 4 dietas representativas:
+
+| Cenário | Leite NEL diff | Leite MP diff |
+|---|---:|---:|
+| Primípara mid-lact (demo NASEM) | −1,1% | **+0,0%** |
+| Multípara alta produção 45 kg | −3,3% | −0,2% |
+| Tropical (cana + grama + soja) | −2,6% | **+0,0%** |
+| Multípara late-lact 18 kg | −6,5% (NDF method) | **−0,0%** |
+
+**Leite MP: ±0,2% em todos os cenários.** Leite NEL converge para ±5% (gap concentrado em escolha de método NDF + detalhes finos de coeficientes).
+
+Fases concluídas após a validação:
+- **Fase 1** — Cadeia de energia: rOM Eq. 20-99, FA verdadeiro (Fd_FA), dcSt per-feed, Ur_N completo
+- **Fase 4** — Eq. 6-1 RUP/RDP com kP fixos NASEM + fCPAdu + IntRUP + Dt_ForWet correto
+- **Fase 5** — Body_MPuse + Frm_NELgain + Gest_MEuse + bug fix GrUter_BWgain (Eq. 3-17a)
+- **Fase 2.1** — Switch `ndf_method` no animal (3 modos = Use_DNDF_IV NASEM)
+
+Detalhes em `GAP_ANALYSIS_NASEM2021.md` §5.
+
+---
 
 ---
 

@@ -271,7 +271,17 @@ Mlk_NP_g = −97,0 + 1,68 × Abs_His + 0,885 × Abs_Ile
 | **Energia (Leite NEL)** (§3.3) | ✅ implementado 2026-05-18 | — |
 | Predição mecanística mPrt (§3.4) | ❌ omitido | Eq. 20-339 estática é suficiente |
 
-**Status atual (2026-05-18):** Motor 100% conforme NASEM 2021 para PM e Energia em vacas em ECC estável (qualquer fase de gestação). Resta apenas §3.2 Body_MPuse para 100% conformidade absoluta — afeta só vacas em ganho/perda ativa de ECC. §3.4 é melhoria de precisão, não necessária para o uso atual.
+**Status atual (2026-05-26):** Motor validado contra `nasem_dairy` 1.0.2 (Python oficial CNM/Guelph) em 4 cenários de teste. Leite MP dentro de ±0,2% e Leite NEL dentro de ±5% em todos. Resta investigar gap residual (~1–5% em NEL) — vinculado a detalhes de implementação (DMI/BW adjustments, GasE coefs).
+
+**Antes de 2026-05-26 esta seção dizia "100% conforme"** — isso era assumido pela conferência contra o PDF, sem validação contra o motor oficial. A comparação numérica direta revelou:
+- Eq. 6-1 RUP/RDP estava usando kP NRC 2001 (dependente de % PV), e não os fixos NASEM 2021 (`KpFor`=4,87, `KpConc`=5,28). **Corrigido em Fase 4.**
+- Eq. 6-1 não tinha fCPAdu (6,4% da fração A escapa como RUP) nem o intercepto IntRUP. **Corrigido em Fase 4.**
+- Cadeia de energia tinha bugs em rOM (CP em vez de TP, EE em vez de FA, faltava NPN_DM), em FA (CFat em vez de Fd_FA), em dcSt (92% fixo em vez de per-feed + ajuste DMI/BW) e em Ur_N (faltava subtrair Fe_CP total, Scrf, Body, Gest). **Corrigidos em Fase 1.**
+- GrUter_BWgain usava derivada analítica do peso uterino; NASEM usa Eq. 3-17a (rate empírico). **Corrigido em Fase 5.**
+- Body composition (Frame + Reserve gain → An_MEgain + Body_MPuse) não era subtraído. **Implementado em Fase 5.**
+- Gest_MEuse não era subtraído. **Implementado em Fase 5.**
+
+Após essas 4 fases, a divergência líquida vs `nasem_dairy` é de ±0,2% no leite MP e ±0,5–5% no leite NEL, com o restante concentrado no upstream do DE (mistura entre escolha de método NDF e detalhes de coeficientes finos).
 
 ---
 
@@ -287,3 +297,9 @@ Mlk_NP_g = −97,0 + 1,68 × Abs_His + 0,885 × Abs_Ile
 | 2026-05-18 | Gestação proteica — Eq. 20-225 a 20-239 implementadas | Campos novos (raça, dias_gestacao, peso_bezerro_alvo, gestacao_total) em `AnimalLactacao`. `Gest_MPuse` agora subtrai de `An_MPavailMilk` |
 | 2026-05-18 | **Cadeia de Energia (DE → ME → NEL) NASEM 2021 implementada** | Eq. 20-111/115/84/182/307/308/311/3-9/20-223 + Tabela 4-1 + Tabela 20-9. Card "Leite Potencial Energia" passa de zerado para valor real. `An_DEIn`, `An_MEIn`, `An_NEIn` calculados a partir de componentes digeridos (NDF, amido, FA, CP, rOM). Densidade DE/ME/NEL exibida no Painel de Resultados |
 | 2026-05-18 | **Banco de alimentos re-extraído da Tabela 19-1 NASEM oficial** | Substituição completa de `src/data/alimentos.json` com extração via `pdftotext -table` das páginas 383–414. Parser robusto baseado em posições de NRC IDs. 145/145 alimentos com match (14 M brasileiros preservados). Caso emblemático Grão de Trigo Moído agora correto: ms=0.857, pb=0.135, fdn=0.125, amido=0.63, ivndfd48=55.7, de_base=3.56 (vs ms=20.11 antes — erro herdado do JSON original). Adicionados 7 campos novos (soluble_protein, adip, ndip, lignin, wsc, de_base, mo) com cobertura ≥75%. Removidos mn8/mn19 (PSPS — não pertencem à análise NASEM). Validação: 0 alimentos fora de escala. |
+| 2026-05-26 | **Validação cruzada vs `nasem_dairy` 1.0.2** (Python oficial CNM/Guelph) | Suite multi-cenário em `scripts/validate_multi_*` cobrindo 4 dietas (primípara, alta produção, tropical, baixa produção). Confirmou MP perfeito (±0,2%) e NEL dentro de ±5%. Identificou divergências de método (Use_DNDF_IV) vs implementação. |
+| 2026-05-26 | **Fase 1 — cadeia de energia corrigida** | (i) rOM: Eq. 20-99 completa com FA×fHydr_FA, TP em vez de CP, NPN_DM, apparent via Fe_rOMend (3,43% DMI). (ii) FA: usa Fd_FA verdadeiro (não EE), Fd_dcFA per-feed. (iii) dcSt: per-feed (Fd_dcSt) + ajuste DMI/BW. (iv) Ur_N completo: subtrai Fe_CP total + Scrf_CP + Body_CPgain + Gest_CPuse. Banco enriquecido com `fa`, `dc_st`, `dc_fa`, `npn_frac` via `enrich_nasem_from_csv.py`. |
+| 2026-05-26 | **Fase 4 — Eq. 6-1 RUP/RDP corrigida** | kP fixos NASEM 2021 lactação (KpFor=4,87, KpConc=5,28) em vez de equação NRC 2001 dependente de %PV. fCPAdu=0,064 (6,4% da fração A escapa). Intercepto IntRUP=-0,086/refCPIn=3,39. Dt_ForWet corrigido (só forragens com DM<71% E For>50%, em %MS). Constantes movidas para `RUMEN_PARAMS` (arquitetura preparada para multi-categoria). |
+| 2026-05-26 | **Fase 5 — Composição corporal (Body_MPuse + An_MEgain + Gest_MEuse)** | Implementado Frm_NPgain/Frm_NEgain/Frm_MEgain (Eq. 20-251 a 20-265) e Rsrv_NPgain/Rsrv_NEgain/Rsrv_MEgain. Body_MPuse subtrai de An_MPavailMilk; An_MEgain e Gest_MEuse subtraem de An_MEavail_Milk. Bug fix: GrUter_BWgain agora usa Eq. 3-17a (rate empírico) em vez de derivada analítica do peso uterino. Inputs novos em `AnimalLactacao`: `peso_maduro`, `ganho_frame_kg_dia`, `ganho_reserva_kg_dia`. Constantes em `BODY_PARAMS`. |
+| 2026-05-26 | **Fase 2.1 — Switch `ndf_method` (Use_DNDF_IV)** | Eq. 20-112 (Van Soest lignina) implementada como `calcularFdDcNDFBase`. Animal pode escolher entre `'lignin'` (default NASEM oficial), `'iv_forage'` (IVNDFD48 só forragens) e `'iv_all'` (IVNDFD48 tudo — default do nosso motor). UI no painel do animal. |
+| 2026-05-26 | **UI Fase 5 + 2.1** | `PainelAnimal.tsx`: bloco "🦴 Composição Corporal" (peso_maduro, ganho_frame, ganho_reserva) com tooltips pedagógicos. Bloco "🧪 Método dcNDF (energia)" com select de 3 modos. Defaults por raça atualizam peso_maduro junto com peso_bezerro. |

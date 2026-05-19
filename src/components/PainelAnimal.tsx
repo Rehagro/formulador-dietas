@@ -69,21 +69,25 @@ function Campo({
 export default function PainelAnimal({ animal, onChange }: Props) {
   const cmsExigida = calcularCMSExigida(animal);
 
-  const dias_gest = animal.dias_gestacao ?? 0;
-  const peso_bez  = animal.peso_bezerro_alvo ?? DEFAULTS_RACA[animal.raca ?? 'Holstein'].peso_bezerro;
-  const raca      = animal.raca ?? 'Holstein';
+  const dias_gest    = animal.dias_gestacao ?? 0;
+  const peso_bez     = animal.peso_bezerro_alvo ?? DEFAULTS_RACA[animal.raca ?? 'Holstein'].peso_bezerro;
+  const raca         = animal.raca ?? 'Holstein';
+  const peso_maduro  = animal.peso_maduro ?? DEFAULTS_RACA[raca].peso_maduro;
+  const ganho_frame  = animal.ganho_frame_kg_dia ?? 0;
+  const ganho_reserva = animal.ganho_reserva_kg_dia ?? 0;
 
   const set = <K extends keyof AnimalLactacao>(key: K) => (v: AnimalLactacao[K]) =>
     onChange({ ...animal, [key]: v });
 
-  // Quando muda a raça, atualiza peso_bezerro_alvo se ainda estiver no default da raça anterior
+  // Quando muda a raça, atualiza peso_bezerro_alvo E peso_maduro se ainda no default antigo
   function handleRaca(nova: Raca) {
-    const oldDef = DEFAULTS_RACA[raca].peso_bezerro;
-    const newDef = DEFAULTS_RACA[nova].peso_bezerro;
+    const oldDef = DEFAULTS_RACA[raca];
+    const newDef = DEFAULTS_RACA[nova];
     onChange({
       ...animal,
       raca: nova,
-      peso_bezerro_alvo: peso_bez === oldDef ? newDef : peso_bez,
+      peso_bezerro_alvo: peso_bez      === oldDef.peso_bezerro ? newDef.peso_bezerro : peso_bez,
+      peso_maduro:       peso_maduro   === oldDef.peso_maduro  ? newDef.peso_maduro  : peso_maduro,
     });
   }
 
@@ -167,6 +171,57 @@ export default function PainelAnimal({ animal, onChange }: Props) {
             onChange={v => onChange({ ...animal, peso_bezerro_alvo: v })}
             dica={"Peso esperado do bezerro ao nascimento. Holstein ≈ 45 kg, Jersey ≈ 28 kg. Se não souber, use o default da raça."} />
         </div>
+      </div>
+
+      {/* ── Bloco de Composição Corporal (Fase 5) ──────────────────────────── */}
+      <div className="mb-3 border border-rose-100 bg-rose-50/40 rounded-lg p-2.5">
+        <div className="text-xs font-bold text-rose-800 mb-2 flex items-center">
+          🦴 Composição Corporal
+          <CampoTooltip texto={
+            "Vacas em crescimento (frame) ou ganhando ECC (reserva) consomem energia e proteína para tecido corporal, " +
+            "competindo com o leite. Para vaca adulta em ECC estável (caso típico): deixe os dois ganhos em 0. " +
+            "Para primípara crescendo: ganho de frame típico 0,1-0,3 kg/d até atingir peso adulto."
+          } />
+        </div>
+        <div className="grid grid-cols-3 gap-2">
+          <Campo label="Peso maduro" hint="kg" value={peso_maduro} min={300} max={900} step={10}
+            onChange={v => onChange({ ...animal, peso_maduro: v })}
+            dica={"Peso adulto esperado da vaca quando atingir maturidade. Holstein ≈ 700 kg, Jersey ≈ 480 kg. " +
+                  "Usado na razão peso/peso_maduro do ganho de frame (Eq. 20-253/258)."} />
+          <Campo label="Ganho frame" hint="kg/d" value={ganho_frame} min={0} max={1} step={0.05}
+            onChange={v => onChange({ ...animal, ganho_frame_kg_dia: Math.max(0, v) })}
+            dica={"Ganho diário esperado de tecido magro/esqueleto (Trg_FrmGain). " +
+                  "Multípara madura: 0. Primípara crescendo: 0,1-0,3 kg/d. " +
+                  "Cada 0,1 kg/d de ganho de frame retira ~0,6 Mcal NEL = ~0,7 kg de leite potencial."} />
+          <Campo label="Ganho ECC" hint="kg/d" value={ganho_reserva} min={-0.5} max={0.5} step={0.05}
+            onChange={v => onChange({ ...animal, ganho_reserva_kg_dia: v })}
+            dica={"Ganho ou perda de reserva (gordura corporal, Trg_RsrvGain). 0 = ECC estável (caso típico). " +
+                  "Negativo = vaca perdendo reserva (BEN no início da lactação). " +
+                  "Positivo = ganhando ECC. Usado para Body_MPuse + An_MEgain."} />
+        </div>
+      </div>
+
+      {/* ── Método de cálculo NDF (Fase 2.1) ──────────────────────────────── */}
+      <div className="mb-3 border border-sky-100 bg-sky-50/40 rounded-lg p-2.5">
+        <label className="text-xs font-bold text-sky-800 mb-1.5 flex items-center">
+          🧪 Método dcNDF (energia)
+          <CampoTooltip texto={
+            "Define qual equação NASEM 2021 calcula a digestibilidade da fibra (NDF) — afeta DE, ME, NEL e leite potencial.\n\n" +
+            "• Lignina (Eq. 20-112): só usa lignina do alimento. Default do NASEM oficial.\n" +
+            "• IVNDFD48 forragens: usa IVNDFD48 medida só nas forragens (concentrados ficam com lignina).\n" +
+            "• IVNDFD48 tudo: usa IVNDFD48 em todos os alimentos. Mais informativa quando dado disponível.\n\n" +
+            "A diferença entre métodos pode chegar a 11% no leite potencial NEL!"
+          } />
+        </label>
+        <select
+          value={animal.ndf_method ?? 'iv_all'}
+          onChange={e => onChange({ ...animal, ndf_method: e.target.value as AnimalLactacao['ndf_method'] })}
+          className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-sky-500"
+        >
+          <option value="lignin">Lignina (Eq. 20-112) — default NASEM</option>
+          <option value="iv_forage">IVNDFD48 forragens + lignina concentrados</option>
+          <option value="iv_all">IVNDFD48 para todos os alimentos</option>
+        </select>
       </div>
 
       {/* CMS Exigida em destaque */}

@@ -2,3 +2,11 @@ node_modules/
 dist/
 .env
 .env.local
+# Python caches dos scripts de validação
+scripts/__pycache__/
+*.pyc
+# Artefatos externos não rastreados (PDFs/planilhas de referência fora do projeto)
+Bookshelf_NBK600603.pdf
+*.docx
+*.xlsx
+Guia-*.html

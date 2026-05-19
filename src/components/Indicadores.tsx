@@ -61,11 +61,17 @@ export default function Indicadores({ resultado }: Props) {
       </div>
 
       <div className="border border-gray-200 rounded-xl p-3 bg-gray-50 w-fit">
-        <div className="text-xs text-gray-500 mb-1 font-medium">Taxas de Passagem</div>
+        <div className="text-xs text-gray-500 mb-1 font-medium">
+          Taxas de Passagem (NASEM 2021)
+        </div>
         <div className="text-xs space-y-0.5 font-medium">
           <div>kPf: <span className="font-bold tabular-nums">{(kPf * 100).toFixed(2)}%/h</span></div>
           <div>kPc: <span className="font-bold tabular-nums">{(kPc * 100).toFixed(2)}%/h</span></div>
           <div>kPl: <span className="font-bold tabular-nums">{(kPl * 100).toFixed(2)}%/h</span></div>
+        </div>
+        <div className="text-[10px] text-gray-500 mt-2 leading-snug max-w-[14rem]">
+          Valores fixos para vaca em lactação (Cap. 6 NASEM 2021). O NRC 2001 usava equação
+          dependente de % PV de forragem/concentrado — abandonada por excesso de ruído.
         </div>
       </div>
     </div>

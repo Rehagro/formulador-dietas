@@ -1,5 +1,60 @@
 import type { Alimento, AnimalLactacao, SlotIngrediente, ResultadoDieta } from '../types';
 
+// ─────────────────────────────────────────────────────────────────────────────
+// PARÂMETROS RUMINAIS — NASEM 2021 por categoria animal
+//
+// Cada categoria (lactação, vaca seca, pré-parto, recria, bezerro) tem seus
+// próprios coeficientes ruminais. Hoje o motor só atende lactação; quando
+// outras categorias forem implementadas, basta:
+//   1. Adicionar entrada nova em RUMEN_PARAMS (ex: VACA_SECA, RECRIA)
+//   2. Criar `calcularResultadosVacaSeca(...)` análoga que selecione o bloco
+//   3. Manter `calcularResultados()` redirecionando por discriminator animal.state
+//
+// Valores extraídos do código oficial nasem_dairy (CNM/Guelph):
+//   - KpFor, KpConc: coeff_dict (nutrient_intakes.py:310)
+//   - fCPAdu, IntRUP, refCPIn: Eq. 6-1 (nutrient_intakes.py:379)
+// ─────────────────────────────────────────────────────────────────────────────
+export interface RumenParams {
+  KpFor:   number;   // %/h — passage rate forragens
+  KpConc:  number;   // %/h — passage rate concentrados
+  fCPAdu:  number;   // 0-1 — fração da CP_A que escapa como RUP (Eq. 6-1)
+  IntRUP:  number;   // kg/d — intercepto NASEM (Eq. 6-1)
+  refCPIn: number;   // kg/d — CP de referência para escala IntRUP
+}
+
+export const RUMEN_PARAMS = {
+  lactacao: {
+    KpFor:    4.87,
+    KpConc:   5.28,
+    fCPAdu:   0.064,
+    IntRUP:  -0.086,
+    refCPIn:  3.39,
+  } satisfies RumenParams,
+  // Futuro:
+  // vaca_seca:  { ... },
+  // pre_parto:  { ... },
+  // recria:     { ... },
+  // bezerro:    { ... },
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// COMPOSIÇÃO CORPORAL — NASEM 2021 (Eq. 20-247 a 20-270 e Tabela 20-11)
+// Constantes do `coeff_dict` oficial nasem_dairy.
+// ─────────────────────────────────────────────────────────────────────────────
+const BODY_PARAMS = {
+  An_GutFill_BW:        0.18,   // fração do BW que é gut fill (Eq. 20-251)
+  Body_NP_CP:           0.86,   // TP / CP ratio (= Body_NP_CP)
+  CPGain_RsrvGain:      0.068,  // CP gain por kg reserva ganha
+  FatGain_RsrvGain:    0.622,   // Fat gain por kg reserva ganha
+  Kg_MP_NP_Trg_cow:     0.69,   // Trg_MP_NP (eficiência NP→MP para ganho corporal, vacas)
+  Kf_ME_RE:             0.40,   // Eficiência RE→ME para ganho de frame (não-bezerro)
+  En_FA:                9.40,   // Mcal/kg — heat of combustion FA
+  En_TP:                5.55,   // Mcal/kg — heat of combustion proteína corporal
+  Ky_ME_NE_gain:        0.14,   // Eficiência ME→NE gestação positiva
+  Ky_ME_NE_loss:        0.89,   // Eficiência ME→NE perda
+  NE_GrUtWt:            0.95,   // Mcal/kg — energia no útero grávido (Eq. 20-234)
+};
+
 export function calcularCMSExigida(animal: AnimalLactacao): number {
   // NRC 2021 Eq. 20-21 (Dt_DMIn_Lact1)
   // Paridade: 0 = primípara, 1 = multípara (equivalente a An_Parity - 1 do NRC)
@@ -20,6 +75,42 @@ export function calcularCMSExigida(animal: AnimalLactacao): number {
 
   // Teto biológico: máx 5% do PV
   return Math.max(0, Math.min(cms, peso * 0.05));
+}
+
+/**
+ * Digestibilidade base de NDF por alimento (NASEM 2021 Eq. 20-111 / 20-112).
+ * O método é escolhido por animal.ndf_method (= Use_DNDF_IV do NASEM oficial).
+ *
+ * Retorna fração 0-1.
+ *
+ * Eq. 20-111 (in vitro): `(12 + 0.61 × IVNDFD48) / 100`
+ *   - Requer IVNDFD48 medido (% do NDF), tipicamente 30-70%.
+ *   - Mais informativo quando disponível.
+ *
+ * Eq. 20-112 (lignina, Van Soest): `0.75 × (NDF − Lg) × (1 − (Lg/NDF)^0.667) / NDF`
+ *   - Usa só lignina, sempre disponível na T19-1 NASEM.
+ *   - É o método DEFAULT do nasem_dairy oficial (`Use_DNDF_IV=0`).
+ */
+export function calcularFdDcNDFBase(
+  a: Alimento,
+  method: NonNullable<AnimalLactacao['ndf_method']>
+): number {
+  const isForage = a.tipo === 'F';
+  // Decide se aplica IVNDFD48 (Eq. 20-111) para ESTE alimento
+  const useIV =
+    method === 'iv_all' ||
+    (method === 'iv_forage' && isForage);
+
+  if (useIV && a.ivndfd48 != null) {
+    return (12 + 0.61 * a.ivndfd48) / 100;             // Eq. 20-111
+  }
+  // Eq. 20-112 — Van Soest, lignina
+  if (a.lignin != null && a.fdn != null && a.fdn > 0 && a.lignin >= 0) {
+    const ratio = Math.min(0.999, a.lignin / a.fdn);
+    const dc    = 0.75 * (a.fdn - a.lignin) * (1 - Math.pow(ratio, 0.667)) / a.fdn;
+    return Math.max(0, Math.min(1, dc));
+  }
+  return 0.50;   // fallback genérico
 }
 
 export function calcularNelAlimento(a: Alimento): number {
@@ -63,33 +154,35 @@ interface TaxasPassagem {
   kPl: number;
 }
 
+/**
+ * Taxas de passagem ruminal (kP) para vaca em LACTAÇÃO.
+ *
+ * NASEM 2021 (Cap. 6, Eq. 6-1) abandona as equações dependentes da composição
+ * da dieta (NRC 2001 — Eq. 20-25/26/27 em função de %PV de F/C) e usa valores
+ * fixos médios: KpFor=4,87%/h e KpConc=5,28%/h. A justificativa do NRC 2021 é
+ * que as antigas equações tinham erro padrão maior que a variação real entre
+ * dietas.
+ *
+ * kPl (líquidos) não é usado na Eq. 6-1 para vaca lactante. Mantido como kPc
+ * para preservar compatibilidade do display em `Indicadores.tsx`.
+ *
+ * Para outras categorias futuras (vaca seca, recria, bezerro), criar funções
+ * análogas — ver bloco RUMEN_PARAMS no topo deste arquivo.
+ *
+ * Os parâmetros `slots`/`alimentos` são mantidos para compatibilidade da API,
+ * mas não são usados (valores ficam constantes na lactação NASEM 2021).
+ */
 export function calcularTaxasPassagem(
-  slots: SlotIngrediente[],
-  alimentos: Alimento[],
-  animal: AnimalLactacao
+  _slots: SlotIngrediente[],
+  _alimentos: Alimento[],
+  _animal: AnimalLactacao
 ): TaxasPassagem {
-  const peso = animal.peso;
-  let kgMS_forragem = 0;
-  let kgMS_concentrado = 0;
-
-  for (const slot of slots) {
-    if (!slot.alimentoNome || slot.kgMN <= 0) continue;
-    const a = alimentos.find(x => x.nome === slot.alimentoNome);
-    if (!a) continue;
-    const kgMS = slot.kgMN * a.ms;
-    if (a.tipo === 'F') { kgMS_forragem += kgMS; }
-    else { kgMS_concentrado += kgMS; } // C e M tratados como concentrado nas taxas de passagem
-  }
-
-  const pctF_PV = (kgMS_forragem / peso) * 100;
-  const pctC_PV = (kgMS_concentrado / peso) * 100;
-
-  // kgMS_silagem removido — silagens agora são tipo F
-  const kPf = (2.365 + (0.214 * pctF_PV) + (0.734 * pctC_PV)) / 100;
-  const kPc = (1.169 + (1.375 * pctF_PV) + (1.721 * pctC_PV)) / 100;
-  const kPl = (4.524 + (0.223 * pctF_PV) + (2.046 * pctC_PV)) / 100;
-
-  return { kPf, kPc, kPl };
+  const p = RUMEN_PARAMS.lactacao;
+  return {
+    kPf: p.KpFor  / 100,
+    kPc: p.KpConc / 100,
+    kPl: p.KpConc / 100,   // alias (NASEM 2021 não distingue líquido em lactação)
+  };
 }
 
 export function calcularResultados(
@@ -108,6 +201,8 @@ export function calcularResultados(
   let kgFDN = 0, kgEFDN = 0, kgFDNF = 0, kgFDA = 0;
   let kgNEL = 0, kgNDT = 0;
   let kgEE = 0, kgEE_INSAT = 0;
+  let kgFA = 0;             // Fd_FA (FA verdadeira, ≠ EE) — Fase 1.2
+  let kgNPN_CP = 0;         // NPN como CP equivalente — Fase 1.1 (rOM Eq. 20-99)
   let kgCNF = 0, kgAMIDO = 0, kgAMIDO_DEG = 0;
   let kgMET = 0, kgLYS = 0;
   let kgCA = 0, kgP = 0, kgMG = 0, kgK = 0, kgS = 0, kgNA = 0, kgCL = 0;
@@ -117,7 +212,7 @@ export function calcularResultados(
   let kgCinza = 0;        // necessário para rOM (Eq. 20-99) na cadeia de energia
   let kgFDN8 = 0;          // PSPS (Penn State) — só conta se mn8 preenchido no alimento
   let kgMS_forragem = 0;
-  let kgMN_forragem = 0;   // necessário para Dt_ForWet (Eq. 20-52/53)
+  let kgMS_ForWet = 0;     // Dt_ForWet (NASEM): forragens com DM<71% E For>50% (silagens, fresca)
   let custoTotal = 0;
 
   // NASEM 2021 — Frações proteicas (Eq. 6-1) e Michaelis-Menten (Eq. 20-74)
@@ -140,11 +235,15 @@ export function calcularResultados(
     const nel = calcularNelAlimento(a);
     const cnf = calcularCNFAlimento(a);
 
-    // ── NASEM 2021 — RUP/RDP via frações proteicas (Eq. 6-1) ──────────────
-    // ATENÇÃO: calcularTaxasPassagem retorna kPx em DECIMAL/h (ex.: 0.031 = 3.1%/h)
-    // Mas a.kd_prot está em %/h. Para o competidor de Eq. 6-1 dar valores corretos
-    // ambos precisam estar em %/h → multiplicar kP por 100.
+    // ── NASEM 2021 — RUP/RDP via Eq. 6-1 completa ──────────────────────────
+    // Fonte: nasem_dairy/nasem_equations/nutrient_intakes.py:319-381
+    //   Fd_RUPIn = (CPAIn − NPN_CPIn) × fCPAdu          ← fração A (6,4% escapa)
+    //            + CPBIn × kP/(kd + kP)                  ← fração B (competição)
+    //            + CPCIn                                  ← fração C (100%)
+    //            + (IntRUP / refCPIn) × CPIn             ← intercepto da regressão
+    // kP em %/h: kPf/kPc retornam decimal (4,87%/h → 0,0487) → × 100
     const kP_pct = (a.tipo === 'F' ? kPf : kPc) * 100;  // %/h
+    const rp = RUMEN_PARAMS.lactacao;
     let kgRUP_f = 0;
     let kgRDP_f = 0;
     let idRUP_f = 0;
@@ -155,14 +254,23 @@ export function calcularResultados(
       const fracC = a.prot_c / 100;
       const kd    = a.kd_prot;  // %/h
 
-      // Fração B compete entre degradação (kd) e passagem (kP), ambos em %/h
-      const rupB = fracB * (kP_pct / (kd + kP_pct));
-      const rupC = fracC;        // 100% escapa (ligada à FDA, indegradável)
-      const rdpA = fracA;        // 100% degrada
-      const rdpB = fracB * (kd / (kd + kP_pct));
+      const kgCPIn  = a.pb * kgMS;
+      const kgCPA   = kgCPIn * fracA;
+      const kgCPB   = kgCPIn * fracB;
+      const kgCPC   = kgCPIn * fracC;
+      const kgNPN_in_feed = kgCPIn * (a.npn_frac ?? 0);  // NPN (todo na fração A)
 
-      kgRUP_f = a.pb * kgMS * (rupB + rupC);
-      kgRDP_f = a.pb * kgMS * (rdpA + rdpB);
+      // (1) Fração A — escapa fCPAdu × (CPA − NPN)
+      const kgRUPA = Math.max(0, kgCPA - kgNPN_in_feed) * rp.fCPAdu;
+      // (2) Fração B — competição kP vs kd
+      const kgRUPB = kgCPB * (kP_pct / (kd + kP_pct));
+      // (3) Fração C — 100% escapa
+      const kgRUPC = kgCPC;
+      // (4) Intercepto da regressão (negativo para CP típica)
+      const intRUP_term = (rp.IntRUP / rp.refCPIn) * kgCPIn;
+
+      kgRUP_f = Math.max(0, kgRUPA + kgRUPB + kgRUPC + intRUP_term);
+      kgRDP_f = Math.max(0, kgCPIn - kgRUP_f);
 
       // Digestibilidade intestinal do RUP (Eq. 20-123/124) — fallback 0,80
       const dcRUP = a.rup_digest !== null
@@ -188,6 +296,11 @@ export function calcularResultados(
     kgNDT += (a.ndt ?? 0) * kgMS;
     kgEE += (a.ee ?? 0) * kgMS;
     kgEE_INSAT += (a.ee_insat ?? 0) * kgMS;
+    // FA verdadeiro: prefere a.fa (Fd_FA do NASEM CSV); fallback 80% do EE
+    // (heurística NASEM Cap. 4 — a maior parte do EE não-FA é cera/glicerol)
+    kgFA += (a.fa ?? ((a.ee ?? 0) * 0.80)) * kgMS;
+    // NPN: Ureia e Cloreto de Amônio têm npn_frac=1.0; demais ~0
+    kgNPN_CP += (a.pb ?? 0) * (a.npn_frac ?? 0) * kgMS;
     kgCNF += cnf * kgMS;
 
     const amido = a.amido ?? 0;
@@ -226,7 +339,9 @@ export function calcularResultados(
 
     if (a.tipo === 'F') {
       kgMS_forragem += kgMS;
-      kgMN_forragem += kgMN;
+      // Dt_ForWet NASEM (nutrient_intakes.py:128-131): só conta forragem com
+      // DM<71% E For>50%. Como a.tipo='F' implica For=100%, basta checar DM.
+      if (a.ms < 0.71) kgMS_ForWet += kgMS;
     }
   }
 
@@ -235,6 +350,75 @@ export function calcularResultados(
   // NEL exibido (nel_mcal_kg) é definido APÓS a cadeia de energia abaixo,
   // porque depende de An_NEIn calculado lá. Declaração com let para permitir
   // referência depois.
+
+  // ── Gestação (pré-cálculo) — Fase 1.3 + Fase 5 ────────────────────────────
+  // Computa GrUter_WtGain (Eq. 3-17a — NÃO é a derivada analítica do peso!).
+  // NASEM 2021 usa modelo empírico (`gestation.py:179-186`):
+  //   GrUter_BWgain = (Ksyn − Kdec × t) × GrUter_Wt(t)
+  // Em seguida deriva Gest_NPgain (Eq. 20-235) e Gest_REgain (Eq. 20-234).
+  let Gest_NPgain_g_pre = 0;
+  let Gest_REgain = 0;  // Mcal NE/d — energia retida no útero
+  {
+    const _dias = animal.dias_gestacao ?? 0;
+    const _peso_bez = animal.peso_bezerro_alvo ?? (animal.raca === 'Jersey' ? 28 : 45);
+    const _T = animal.gestacao_total ?? 280;
+    if (_dias > 0 && _dias <= _T) {
+      const _Ksyn  = 2.43e-2;
+      const _Kdec  = 2.45e-5;
+      const _fGU_F = 1.816;
+      const _GU0   = _peso_bez * _fGU_F;
+      const _expo  = -(_Ksyn - _Kdec * _dias) * (_T - _dias);
+      const _GU    = _GU0 * Math.exp(_expo);
+      // Eq. 3-17a — rate empírico no dia t (NÃO é derivada de GU):
+      const _GUgain = (_Ksyn - _Kdec * _dias) * _GU;
+      Gest_NPgain_g_pre = _GUgain * 123 * 0.86;
+      Gest_REgain       = _GUgain * BODY_PARAMS.NE_GrUtWt;     // Eq. 20-234
+    }
+  }
+  // Eq. 20-237 — Gest_MEuse = REgain / Ky_ME_NE
+  const Ky_ME_NE  = Gest_REgain >= 0 ? BODY_PARAMS.Ky_ME_NE_gain : BODY_PARAMS.Ky_ME_NE_loss;
+  const Gest_MEuse = Gest_REgain / Ky_ME_NE;
+
+  // ── Composição corporal — Fase 5 (NASEM 2021 Eq. 20-247 a 20-270) ─────────
+  // Frame gain (esqueleto/órgãos) + Reserve gain (gordura/ECC).
+  // Para vaca em ECC estável (madura, sem ganho de frame): tudo zero.
+  const peso_maduro = animal.peso_maduro
+    ?? (animal.raca === 'Jersey' ? 500 : 700);
+  const Trg_FrmGain   = animal.ganho_frame_kg_dia   ?? 0;
+  const Trg_RsrvGain  = animal.ganho_reserva_kg_dia ?? 0;
+  const BW_ratio      = animal.peso / peso_maduro;
+
+  // FRAME ── Eq. 20-251/253 (empty body), 20-258 (Frm_NPgain), 20-262 (Frm_NEgain)
+  const Frm_Gain_empty = Trg_FrmGain * (1 - BODY_PARAMS.An_GutFill_BW);
+  const FatGain_FrmGain = 0.067 + 0.375 * BW_ratio;             // Eq. 20-253
+  const Frm_Fatgain    = FatGain_FrmGain * Frm_Gain_empty;
+  const CPGain_FrmGain = 0.201 - 0.081 * BW_ratio;              // Eq. 20-258
+  const Frm_NPgain     = CPGain_FrmGain * BODY_PARAMS.Body_NP_CP * Frm_Gain_empty;
+  const Frm_CPgain     = Frm_NPgain / BODY_PARAMS.Body_NP_CP;
+  const Frm_NEgain     = BODY_PARAMS.En_FA * Frm_Fatgain
+                       + BODY_PARAMS.En_TP * Frm_CPgain;        // Eq. 20-263
+  const Frm_MEgain     = Frm_NEgain / BODY_PARAMS.Kf_ME_RE;     // Eq. 20-265
+
+  // RESERVE (ECC) ── Eq. 20-259 (Rsrv_NPgain), 20-264 (Rsrv_NEgain)
+  // Sem gut fill (reserva é gordura/músculo, fora do TGI).
+  const Rsrv_Gain_empty = Trg_RsrvGain;
+  const Rsrv_Fatgain    = BODY_PARAMS.FatGain_RsrvGain * Rsrv_Gain_empty;
+  const Rsrv_CPgain     = BODY_PARAMS.CPGain_RsrvGain  * Rsrv_Gain_empty;
+  const Rsrv_NPgain     = Rsrv_CPgain * BODY_PARAMS.Body_NP_CP;
+  const Rsrv_NEgain     = BODY_PARAMS.En_FA * Rsrv_Fatgain
+                        + BODY_PARAMS.En_TP * Rsrv_CPgain;
+  // Kr_ME_RE depende de ganho vs perda (Eq. 3-19a; sempre lactante aqui)
+  const Kr_ME_RE   = Trg_RsrvGain > 0 ? 0.75 : 0.89;
+  const Rsrv_MEgain = Rsrv_NEgain / Kr_ME_RE;
+
+  // BODY TOTAL ── Eq. 20-270
+  const Body_NPgain    = Frm_NPgain + Rsrv_NPgain;            // kg/d
+  const Body_NPgain_g  = Body_NPgain * 1000;
+  // Para vaca lactante (paridade 0 ou 1 — primípara ou multípara): Kg_MP_NP = 0,69
+  const Kg_MP_NP_Trg   = BODY_PARAMS.Kg_MP_NP_Trg_cow;
+  const Body_MPuse_g   = Body_NPgain_g / Kg_MP_NP_Trg;        // Eq. 20-270
+  const Body_MPuse     = Body_MPuse_g / 1000;                  // kg/d
+  const An_MEgain      = Frm_MEgain + Rsrv_MEgain;             // Eq. 20-247
 
   // ── Proteína Microbiana — Michaelis-Menten (NASEM 2021 Eq. 20-74/75/76) ─────
   // Parâmetros fixos (Eq. 20-75)
@@ -262,7 +446,9 @@ export function calcularResultados(
     const St_pct  = (kgAMIDO / totalKgMS) * 100;
     const CP_pct  = (kgPB / totalKgMS) * 100;
     const ForNDF_pct = (kgFDNF / totalKgMS) * 100; // % FDN forragem na MS
-    const ForWet_pct = totalKgMN > 0 ? (kgMN_forragem / totalKgMN) * 100 : 0;
+    // Dt_ForWet NASEM: % de FORRAGEM ÚMIDA (silagens/fresca) na MS da dieta.
+    // ≠ "%forragem na MN" usado anteriormente. Ver nutrient_intakes.py:128-131.
+    const ForWet_pct = totalKgMS > 0 ? (kgMS_ForWet / totalKgMS) * 100 : 0;
     const ADF_div_NDF_pct = kgFDN > 0 ? (kgFDA / kgFDN) * 100 : 0;
 
     // Eq. 20-52 — Rum_dcNDF em %
@@ -324,23 +510,28 @@ export function calcularResultados(
   const mp_mantenca = (Scrf_NP + Fe_NPend) / KmMP_NP + Ur_NPend;          // kg/d
 
   // ── NASEM 2021 — Cadeia de Energia (DE → ME → NEL) ───────────────────────
-  // Implementa Eq. 20-111/113/114/115 (NDF total tract), Eq. 20-84 (Amido TT),
+  // Implementa Eq. 20-111/112/113/114/115 (NDF total tract), Eq. 20-84 (Amido TT),
   // Eq. 3-7b (CP digestion), Eq. 20-99 (rOM), Eq. 20-153 (FA dig via Tabela 4-1),
   // Eq. 20-182 (DE), Eq. 20-308/311 (Ur_DE), Eq. 3-9/20-310 (GasE), Eq. 20-307/223 (ME/NEL).
+  //
+  // Método de cálculo de dcNDF (NASEM Use_DNDF_IV):
+  //   'lignin'    → Eq. 20-112 (Van Soest, baseada em lignina) — default NASEM
+  //   'iv_forage' → Eq. 20-111 para forragens, lignina para concentrados
+  //   'iv_all'    → Eq. 20-111 para todos (escolha do nosso motor por default)
+  const ndf_method: NonNullable<AnimalLactacao['ndf_method']> =
+    animal.ndf_method ?? 'iv_all';
+
   let An_DEIn = 0, An_MEIn = 0, An_NEIn = 0;
   let Dt_DigNDFIn = 0, Dt_DigStIn = 0, Dt_DigFAIn = 0, An_DigCPaIn = 0, Dt_DigrOMIn = 0;
   if (totalKgMS > 0) {
-    // 1) Total Tract NDF (Eq. 20-111 com IVNDFD48; ajustes Eq. 20-115)
+    // 1) Total Tract NDF (Eq. 20-111 ou 20-112 conforme ndf_method; ajustes 20-115)
     let Dt_DigNDFIn_Base_kg = 0;
     for (const slot of slots) {
       if (!slot.alimentoNome || slot.kgMN <= 0) continue;
       const a = alimentos.find(x => x.nome === slot.alimentoNome);
       if (!a || !a.fdn || a.fdn <= 0) continue;
       const kgMS_slot = slot.kgMN * a.ms;
-      // Fd_dcNDF_base: Eq. 20-111 se IVNDFD48 disponível; fallback 0,50 (média NASEM forrageiras)
-      const Fd_dcNDF_base = (a.ivndfd48 !== null && a.ivndfd48 !== undefined)
-        ? (12 + 0.61 * a.ivndfd48) / 100
-        : 0.50;
+      const Fd_dcNDF_base = calcularFdDcNDFBase(a, ndf_method);
       Dt_DigNDFIn_Base_kg += Fd_dcNDF_base * a.fdn * kgMS_slot;
     }
     const Dt_dcNDF_Base = kgFDN > 0 ? Dt_DigNDFIn_Base_kg / kgFDN : 0;
@@ -351,45 +542,83 @@ export function calcularResultados(
     ));
     Dt_DigNDFIn = Dt_dcNDF * kgFDN;
 
-    // 2) Total Tract Starch (TT_dcSt = 0,92 — default NASEM Cap. 4 para amidos típicos)
-    Dt_DigStIn = kgAMIDO * 0.92;
+    // 2) Total Tract Starch — Fase 1.4: dcSt per-feed (Fd_dcSt do NASEM CSV)
+    //    + ajuste DMI/BW (NASEM Cap. 4, calculate_TT_dcSt):
+    //    TT_dcSt = TT_dcSt_Base − (DMI/BW − 0,035) × 100 (em pp)
+    let Dt_DigStIn_Base = 0;
+    for (const slot of slots) {
+      if (!slot.alimentoNome || slot.kgMN <= 0) continue;
+      const a = alimentos.find(x => x.nome === slot.alimentoNome);
+      if (!a || !a.amido) continue;
+      const kgMS_slot = slot.kgMN * a.ms;
+      const dcSt = (a.dc_st ?? 92) / 100;     // fração; default 92% (sem dado)
+      Dt_DigStIn_Base += dcSt * a.amido * kgMS_slot;
+    }
+    const TT_dcSt_Base = kgAMIDO > 0 ? Dt_DigStIn_Base / kgAMIDO : 0;
+    const TT_dcSt = Math.max(0,
+      TT_dcSt_Base - (totalKgMS / animal.peso - 0.035));   // ajuste DMI/BW
+    Dt_DigStIn = TT_dcSt * kgAMIDO;
 
-    // 3) FA digestion — Tabela 4-1 NASEM (heurística por nome/classificação)
+    // 3) FA digestion — Fase 1.2: usa Fd_FA (FA verdadeira); fallback 80%×EE.
+    //    Fd_dcFA per-feed se disponível; senão heurística por classe (Tabela 4-1).
     for (const slot of slots) {
       if (!slot.alimentoNome || slot.kgMN <= 0) continue;
       const a = alimentos.find(x => x.nome === slot.alimentoNome);
       if (!a) continue;
       const kgMS_slot = slot.kgMN * a.ms;
-      const kgFA_slot = (a.ee ?? 0) * kgMS_slot;
+      const fa_frac   = a.fa ?? ((a.ee ?? 0) * 0.80);
+      const kgFA_slot = fa_frac * kgMS_slot;
       if (kgFA_slot <= 0) continue;
-      let dcFA = 0.73;  // default Tabela 4-1
-      const nm = a.nome.toLowerCase();
-      if (a.classificacao === 'Gordura/Óleo' && nm.includes('óleo de')) dcFA = 0.70;
-      else if (nm.includes('sabões de cálcio')) dcFA = 0.76;
+      let dcFA: number;
+      if (a.dc_fa != null) {
+        dcFA = a.dc_fa / 100;
+      } else {
+        dcFA = 0.73;
+        const nm = a.nome.toLowerCase();
+        if (a.classificacao === 'Gordura/Óleo' && nm.includes('óleo de')) dcFA = 0.70;
+        else if (nm.includes('sabões de cálcio')) dcFA = 0.76;
+      }
       Dt_DigFAIn += dcFA * kgFA_slot;
     }
 
-    // 4) CP digestion (Eq. 3-7b)
+    // 4) CP digestion (Eq. 3-7b) — aparente
     An_DigCPaIn = Math.max(0, An_RDPIn + An_idRUPIn - (Du_MiCP - Du_idMiCP) - Fe_CPend);
 
-    // 5) rOM (Eq. 20-99): rOM = OM - NDF - amido - FA - CP, dcrOM = 96,1%
-    const kgOM  = Math.max(0, totalKgMS - kgCinza);
-    const kgROM = Math.max(0, kgOM - kgFDN - kgAMIDO - kgEE - kgPB);
-    Dt_DigrOMIn = kgROM * 0.961;
+    // 5) rOM — Fase 1.1: Eq. 20-99 completa + APARENTE (NASEM Cap. 4).
+    //    rOM = OM − NDF − Amido − (FA × fHydr_FA) − TP − NPN_DM
+    //    Dt_DigrOMt   = kgROM × 0.96 (Fd_dcrOM)
+    //    Dt_DigrOMaIn = Dt_DigrOMtIn − Fe_rOMend  (Fe_rOMend = 3,43% × DMI)
+    //    A Eq. 20-182 usa o APARENTE, não o total.
+    const fHydr_FA  = 1.06;
+    const kgTP      = Math.max(0, kgPB - kgNPN_CP);
+    const kgNPN_DM  = kgNPN_CP / 2.81;
+    const kgOM      = Math.max(0, totalKgMS - kgCinza);
+    const kgROM     = Math.max(0, kgOM - kgFDN - kgAMIDO - (kgFA * fHydr_FA) - kgTP - kgNPN_DM);
+    const Fe_rOMend = 0.0343 * totalKgMS;     // Eq. NASEM fecal.py:24
+    Dt_DigrOMIn     = Math.max(0, kgROM * 0.96 - Fe_rOMend);
 
-    // 6) DE intake (Eq. 20-182) com heats of combustion da Tabela 20-9
+    // 6) DE intake (Eq. 20-182) com heats of combustion da Tabela 20-9.
+    //    NPN tem Eq. 20-308 separada (Dt_DETPIn = DE_CP − DE_NPN_CP × 5.65/0.89):
+    //      DE = NDF + St + FA + (DigCPa − NPN_CP) × 5.65 + NPN_CP × 0.89 + rOM
+    //         = ... + DigCPa × 5.65 − NPN_CP × (5.65 − 0.89)
     An_DEIn = Dt_DigNDFIn * 4.20
             + Dt_DigStIn  * 4.23
             + Dt_DigFAIn  * 9.40
             + An_DigCPaIn * 5.65
+            - kgNPN_CP    * (5.65 - 0.89)   // NPN downgrade: ~−4.76 Mcal/kg
             + Dt_DigrOMIn * 4.00;
-    // Nota v1: NPN (Ureia) tratado como CP normal — superestima DE_CP em ~1%
-    // quando há Ureia na dieta (ela tem 0,89 Mcal/kg vs 5,65 do TP). Documentado.
 
-    // 7) Urinary energy (Eq. 20-311 e 20-308)
-    const Milk_CP_g = animal.leite * animal.proteina * 10;  // kg leite × % CP × 10 → g/d
-    const Ur_N_g    = Math.max(0, (kgPB * 1000 - Milk_CP_g - Fe_CPend * 1000) / 6.25);
-    const Ur_DEIn   = 0.0143 * Ur_N_g;
+    // 7) Urinary energy — Fase 1.3: fórmula NASEM completa (urine.py:11-22).
+    //    Ur_Nout_g = (Dt_CP − Fe_CP_total − Scrf_CP − Fe_CPend − Mlk_CP − Body − Gest)/6.25
+    const Fe_CP_total   = Math.max(0, kgPB - An_DigCPaIn);
+    const Scrf_CP_g     = 0.20 * Math.pow(animal.peso, 0.60); // CP equiv, Body_NP_CP=0.86
+    const Body_CPgain_g = 0;  // ECC estável (Fase 5 implementará Body_MPuse)
+    const Gest_CPuse_g  = Gest_NPgain_g_pre / 0.86;  // NP → CP via Body_NP_CP
+    const Milk_CP_g     = animal.leite * animal.proteina * 10;  // g/d
+    const Ur_N_g        = Math.max(0,
+      (kgPB * 1000 - Fe_CP_total * 1000 - Scrf_CP_g - Fe_CPend * 1000
+       - Milk_CP_g - Body_CPgain_g - Gest_CPuse_g) / 6.25);
+    const Ur_DEIn       = 0.0143 * Ur_N_g;
 
     // 8) Gas energy — vaca lactando (Eq. 3-9 / 20-310 caso "Lactating Cow")
     const FA_pctMS    = (kgEE / totalKgMS) * 100;
@@ -405,62 +634,36 @@ export function calcularResultados(
   // Densidade NEL exibida (Mcal/kg MS) — vem da cadeia NASEM, com fallback legacy
   const nel_mcal_kg = An_NEIn > 0 ? An_NEIn / ms : kgNEL / ms;
 
-  // ── Leite potencial pela energia (NASEM 2021 Eq. 3-13/14a) ─────────────────
+  // ── Leite potencial pela energia (NASEM 2021 milk.py:329-365) ──────────────
+  // Mlk_Prod_NEalow = An_MEavail_Milk × Kl_ME_NE / Trg_NEmilk_Milk
+  // onde An_MEavail_Milk = An_MEIn − An_MEmUse − An_MEgain − Gest_MEuse
+  // e An_MEmUse = NEmantenca / Km_ME_NE (Km_ME_NE = 0,66 para vaca)
+  //
+  // Trg_NEmilk_Milk (Eq. 3-14b): 9,29×Fat% + 5,85×TP% + 3,95×Lact% / 100.
+  // Nosso `animal.proteina` é CP%; converte para TP via × 0,94.
   const nelMantenca       = 0.10 * Math.pow(animal.peso, 0.75);                // Eq. 3-13
-  const nel_por_kg_leite  = 0.0929 * animal.gordura + 0.055 * animal.proteina + 0.0395 * animal.lactose;
+  const Km_ME_NE          = 0.66;
+  const Kl_ME_NE          = 0.66;
+  const An_MEmUse         = nelMantenca / Km_ME_NE;
+  const An_MEavail_Milk   = Math.max(0, An_MEIn - An_MEmUse - An_MEgain - Gest_MEuse);
+  const Trg_MilkTPp       = animal.proteina * 0.94;
+  const nel_por_kg_leite  = 9.29 * animal.gordura / 100
+                          + 5.85 * Trg_MilkTPp    / 100
+                          + 3.95 * animal.lactose / 100;
   const leite_potencial_nel = nel_por_kg_leite > 0
-    ? Math.max(0, (An_NEIn - nelMantenca) / nel_por_kg_leite)
+    ? Math.max(0, An_MEavail_Milk * Kl_ME_NE / nel_por_kg_leite)
     : 0;
 
   // ── Gestação proteica — Gest_MPuse (NASEM 2021 Eq. 20-225 a 20-239) ──────
-  // Calcula MP consumida pelo crescimento do útero grávido. Subtrai de
-  // An_MPavailMilk junto com a manutenção.
-  //
-  // Parâmetros do modelo exponencial Koong (1975), Tabela 20-10:
-  //   K_GrUterSyn     = 2,43×10⁻²
-  //   K_GrUterSynDecay = 2,45×10⁻⁵
-  //   GrUter:Fetus ratio (parto) = 1,816 kg/kg (gestação de 280 d)
-  //
-  // Modelo: GrUter_Wt(t) = GrUter_Wt_parto × exp(−(Ks − Kd × t) × (T − t))
-  // Derivada: GrUter_WtGain = GrUter_Wt × (Ks + Kd × T − 2 × Kd × t)
-  const dias_gest    = animal.dias_gestacao ?? 0;
-  const peso_bez     = animal.peso_bezerro_alvo ?? (animal.raca === 'Jersey' ? 28 : 45);
-  const T_gest       = animal.gestacao_total ?? 280;
-  let Gest_MPuse = 0;
-  if (dias_gest > 0 && dias_gest <= T_gest) {
-    const K_GrUterSyn      = 2.43e-2;
-    const K_GrUterSynDecay = 2.45e-5;
-    const fGrUter_Fetus    = 1.816;       // Eq. 20-225 (LengthGest = 280)
-    const GrUter_Wt_parto  = peso_bez * fGrUter_Fetus;
-
-    // Eq. 20-227 — peso do útero grávido no dia DayGest
-    const expoente = -(K_GrUterSyn - K_GrUterSynDecay * dias_gest) * (T_gest - dias_gest);
-    const GrUter_Wt = GrUter_Wt_parto * Math.exp(expoente);
-
-    // Derivada analítica → ganho diário (Eq. 20-233)
-    const GrUter_WtGain = GrUter_Wt
-      * (K_GrUterSyn + K_GrUterSynDecay * T_gest - 2 * K_GrUterSynDecay * dias_gest);
-
-    // Eq. 20-235 — Gest_NPgain (g/d), com 123 g NP/kg e fator escala 0,86
-    const Gest_NPgain_g = GrUter_WtGain * 123 * 0.86;
-
-    // Eq. 20-238/239 — KyMP_NP = 0,33 (gestação positiva)
-    const KyMP_NP = 0.33;
-    Gest_MPuse = (Gest_NPgain_g / KyMP_NP) / 1000;   // converte g → kg
-  }
+  // KyMP_NP = 0,33 (Eq. 20-238/239 — gestação positiva).
+  const Gest_MPuse = (Gest_NPgain_g_pre / 0.33) / 1000;   // g → kg
 
   // ── Leite potencial pela proteína (NASEM 2021 Eq. 20-339 derivada) ───────
-  // A Eq. 20-339 do PDF está impressa como divisão por KlMP, mas a derivação
-  // da Eq. 20-212 (Mlk_MPuse = Mlk_NP / KlMP) e a validação da Tabela 20-16
-  // (observado 30.9 vs previsto 32.6 kg/d) indicam que KlMP deve estar no
-  // numerador. Logo: leite = An_MPavailMilk × KlMP / (Trg_MilkTPp/100)
-  //
-  // OMISSÃO INTENCIONAL restante (vs Eq. 20-337 NASEM completa):
-  //   - Body_MPuse  (Eq. 20-270): requer An_NPgain (ECC alvo vs atual). Para
-  //     vacas em ECC estável (foco do app), ≈ 0. Documentado em /calculos.
-  const An_MPavailMilk = Math.max(0, An_MPIn - mp_mantenca - Gest_MPuse);
+  // Eq. 20-337 NASEM completa:
+  //   An_MPavailMilk = An_MPIn − mp_mantenca − Body_MPuse − Gest_MPuse
+  // Body_MPuse calculado no bloco "Composição corporal" acima (Fase 5).
+  const An_MPavailMilk = Math.max(0, An_MPIn - mp_mantenca - Body_MPuse - Gest_MPuse);
   const KlMP_NP_Trg    = 0.69;
-  const Trg_MilkTPp    = animal.proteina * 0.94;  // CP%→TP% (NASEM Cap. 3)
   const leite_potencial_prot = Trg_MilkTPp > 0
     ? Math.max(0, An_MPavailMilk * KlMP_NP_Trg / (Trg_MilkTPp / 100))
     : 0;
