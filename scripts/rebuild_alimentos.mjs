@@ -170,8 +170,8 @@ const novo = atual.map(a => {
     if (ndt >= 0 && ndt <= 1.2) reescrito.ndt = parseFloat(ndt.toFixed(6));
   }
 
-  // ── Enriquecimento CSV NASEM (Fase 1) — dc_st, npn_frac, dc_fa ──────────
-  // Estes 3 campos não estão na T19-1 impressa, vêm do feed library oficial.
+  // ── Enriquecimento CSV NASEM — dc_st, npn_frac, dc_fa, ee_insat ─────────
+  // Estes campos não estão na T19-1 impressa, vêm do feed library oficial.
   const extraRec = nasemRec.nrc_id ? extra[nasemRec.nrc_id] : null;
   if (extraRec) {
     if (extraRec.dc_st  !== undefined) reescrito.dc_st    = extraRec.dc_st;
@@ -179,6 +179,11 @@ const novo = atual.map(a => {
     if (extraRec.npn_cp !== undefined) reescrito.npn_frac = parseFloat((extraRec.npn_cp / 100).toFixed(4));
     if (extraRec.fa !== undefined && extraRec.fa !== null) {
       reescrito.fa = parseFloat((extraRec.fa / 100).toFixed(6));
+    }
+    // EE insaturado (Σ frações C16:1 + C18:1 cis/trans + C18:2 + C18:3)
+    // Valor em % MS → fração 0-1 no banco
+    if (extraRec.ee_insat !== undefined && extraRec.ee_insat !== null) {
+      reescrito.ee_insat = parseFloat((extraRec.ee_insat / 100).toFixed(6));
     }
   }
 

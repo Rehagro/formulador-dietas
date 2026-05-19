@@ -17,6 +17,9 @@ CSV = os.path.join(PKG, 'data/feed_library/NASEM_feed_library.csv')
 fl = pd.read_csv(CSV)
 
 out = {}
+# Frações de ácidos graxos insaturados (% do FA total). Soma → fração insaturada.
+UNSAT_COLS = ['Fd_C161_FA', 'Fd_C181t_FA', 'Fd_C181c_FA', 'Fd_C182_FA', 'Fd_C183_FA']
+
 for _, r in fl.iterrows():
     uid = r['UID']
     if not isinstance(uid, str) or not uid.startswith('NRC16F'):
@@ -26,6 +29,23 @@ for _, r in fl.iterrows():
     if pd.notna(r.get('Fd_NPN_CP')):   rec['npn_cp']    = float(r['Fd_NPN_CP'])   # % of CP
     if pd.notna(r.get('Fd_dcFA')):     rec['dc_fa']     = float(r['Fd_dcFA'])     # %
     if pd.notna(r.get('Fd_FA')):       rec['fa']        = float(r['Fd_FA'])       # % DM
+
+    # EE insaturado (% MS) — soma das frações insaturadas (% do FA) × FA total.
+    # CSV NASEM tem NaN em algumas frações (ex: C181t_FA "trans" muitas vezes não
+    # medido). Trata NaN como 0 explicitamente (NaN é truthy em Python — `nan or 0`
+    # retorna nan, não 0).
+    fa = r.get('Fd_FA')
+    if pd.notna(fa) and float(fa) > 0:
+        unsat_pct_FA = 0.0
+        any_present = False
+        for c in UNSAT_COLS:
+            v = r.get(c)
+            if pd.notna(v):
+                unsat_pct_FA += float(v)
+                any_present = True
+        if any_present:
+            rec['ee_insat'] = float(fa) * unsat_pct_FA / 100   # % MS
+
     out[uid] = rec
 
 dst = r'C:/Users/rasaf/nasem_t191_extra.json'
