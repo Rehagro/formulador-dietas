@@ -124,11 +124,39 @@ export default function PainelResultados({ resultado, leite, precoLeite }: Props
         📊 Resultados
       </h2>
 
-      {/* CMS — barra de progresso */}
-      <div className="bg-blue-50 border border-blue-200 rounded-xl p-3">
-        <div className="text-base font-bold text-blue-700 mb-2">
-          🥛 Consumo
+      {/* 3 cards de destaque lado a lado: CMS, Leite Energia, Leite Proteína */}
+      <div className="grid grid-cols-3 gap-2">
+        <div className="border rounded-xl p-3 text-center bg-orange-50 border-orange-200">
+          <div className="text-sm font-bold text-orange-700 mb-1 leading-tight">
+            🥛 CMS Exigida
+          </div>
+          <div className="text-3xl font-bold text-orange-800 tabular-nums leading-tight">
+            {cmsExigida.toFixed(1)}
+          </div>
+          <div className="text-xs text-orange-600 mt-0.5">kg MS / dia</div>
         </div>
+        <div className={`border rounded-xl p-3 text-center ${fator_limitante === 'energia' ? 'bg-emerald-100 border-emerald-400 ring-2 ring-emerald-400' : 'bg-emerald-50 border-emerald-200'}`}>
+          <div className="text-sm font-bold text-emerald-700 mb-1 leading-tight">
+            ⚡ Leite p/ Energia
+          </div>
+          <div className="text-3xl font-bold text-emerald-800 tabular-nums leading-tight">
+            {leite_potencial_nel.toFixed(1)}
+          </div>
+          <div className="text-xs text-emerald-600 mt-0.5">kg/dia</div>
+        </div>
+        <div className={`border rounded-xl p-3 text-center ${fator_limitante === 'proteina' ? 'bg-violet-100 border-violet-400 ring-2 ring-violet-400' : 'bg-violet-50 border-violet-200'}`}>
+          <div className="text-sm font-bold text-violet-700 mb-1 leading-tight">
+            🧬 Leite p/ Proteína
+          </div>
+          <div className="text-3xl font-bold text-violet-800 tabular-nums leading-tight">
+            {leite_potencial_prot.toFixed(1)}
+          </div>
+          <div className="text-xs text-violet-600 mt-0.5">kg/dia</div>
+        </div>
+      </div>
+
+      {/* Barra CMS formulada vs exigida (% atendimento) */}
+      <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 -mt-1">
         <div className="flex justify-between text-sm text-blue-700 mb-1 font-medium">
           <span>CMS formulada vs exigida</span>
           <span className="tabular-nums font-bold">{totalKgMS.toFixed(1)} / {cmsExigida.toFixed(1)} kg</span>
@@ -140,28 +168,6 @@ export default function PainelResultados({ resultado, leite, precoLeite }: Props
           />
         </div>
         <div className="text-xs text-blue-500 text-right mt-1 tabular-nums">{pctCMS.toFixed(0)}%</div>
-      </div>
-
-      {/* Cards de leite potencial + custos */}
-      <div className="grid grid-cols-2 gap-2">
-        <div className={`border rounded-xl p-3 text-center ${fator_limitante === 'energia' ? 'bg-emerald-100 border-emerald-400 ring-2 ring-emerald-400' : 'bg-emerald-50 border-emerald-200'}`}>
-          <div className="text-sm font-bold text-emerald-700 mb-1 leading-tight">
-            ⚡ Leite Potencial para Energia
-          </div>
-          <div className="text-3xl font-bold text-emerald-800 tabular-nums leading-tight">
-            {leite_potencial_nel.toFixed(1)}
-          </div>
-          <div className="text-xs text-emerald-600 mt-0.5">kg/dia</div>
-        </div>
-        <div className={`border rounded-xl p-3 text-center ${fator_limitante === 'proteina' ? 'bg-violet-100 border-violet-400 ring-2 ring-violet-400' : 'bg-violet-50 border-violet-200'}`}>
-          <div className="text-sm font-bold text-violet-700 mb-1 leading-tight">
-            🧬 Leite Potencial para Proteína
-          </div>
-          <div className="text-3xl font-bold text-violet-800 tabular-nums leading-tight">
-            {leite_potencial_prot.toFixed(1)}
-          </div>
-          <div className="text-xs text-violet-600 mt-0.5">kg/dia</div>
-        </div>
       </div>
 
       {/* Densidade energética da dieta (NASEM 2021 — cadeia DE → ME → NEL) */}

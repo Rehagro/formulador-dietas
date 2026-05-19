@@ -85,12 +85,21 @@ function debugEnergiaTS(slots, alimentos, animal) {
   // Fe_CPend (Eq. 20-300/302)
   const fdn_pct = (kgFDN / totalKgMS) * 100;
   const Fe_CPend = (12.0 + 0.12 * fdn_pct) * totalKgMS / 1000;
-  // rOM completo (Fase 1.1, Eq. 20-99) + aparente (subtrai Fe_rOMend)
-  const fHydr_FA = 1.06;
+  // rOM (Eq. 20-99) com Fd_fHydr_FA per-feed (1/1.06 normal, 1.0 só FA supp)
+  let kgFA_fHydr = 0;
+  for (const s of slots) {
+    const a = alimentos.find(x => x.nome === s.alimentoNome);
+    if (!a) continue;
+    const kgMS = s.kgMN * a.ms;
+    const fa_frac = a.fa ?? ((a.ee ?? 0) * 0.80);
+    const isFASupp = a.classificacao === 'Gordura/Óleo';
+    const fHydr = isFASupp ? 1.0 : (1 / 1.06);
+    kgFA_fHydr += fa_frac * kgMS * fHydr;
+  }
   const kgTP     = Math.max(0, kgPB - kgNPN_CP);
   const kgNPN_DM = kgNPN_CP / 2.81;
   const kgOM     = Math.max(0, totalKgMS - kgCinza);
-  const kgROM    = Math.max(0, kgOM - kgFDN - kgAMIDO - (kgFA * fHydr_FA) - kgTP - kgNPN_DM);
+  const kgROM    = Math.max(0, kgOM - kgFDN - kgAMIDO - kgFA_fHydr - kgTP - kgNPN_DM);
   const Fe_rOMend = 0.0343 * totalKgMS;
   const Dt_DigrOMIn = Math.max(0, kgROM * 0.96 - Fe_rOMend);
   // CP_a (mesma de calculos.ts, requer Du_MiCP estimate — usa diet-level MM aproximada)
@@ -120,7 +129,7 @@ function debugEnergiaTS(slots, alimentos, animal) {
   // Nota: o Ur_N real depende de An_DigCPaIn. Para validação granular usamos
   // o An_DigCPaIn implícito derivado do DE total e dos outros componentes.
   // GasE
-  const FA_pctMS   = (kgEE / totalKgMS) * 100;
+  const FA_pctMS   = (kgFA / totalKgMS) * 100;
   const dNDF_pctMS = (Dt_DigNDFIn / totalKgMS) * 100;
   const An_GasEOut = 0.294 * totalKgMS - 0.347 * FA_pctMS + 0.0409 * dNDF_pctMS;
   return {

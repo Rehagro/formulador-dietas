@@ -515,11 +515,14 @@ export function calcularResultados(
   // Eq. 20-182 (DE), Eq. 20-308/311 (Ur_DE), Eq. 3-9/20-310 (GasE), Eq. 20-307/223 (ME/NEL).
   //
   // Método de cálculo de dcNDF (NASEM Use_DNDF_IV):
-  //   'lignin'    → Eq. 20-112 (Van Soest, baseada em lignina) — default NASEM
-  //   'iv_forage' → Eq. 20-111 para forragens, lignina para concentrados
-  //   'iv_all'    → Eq. 20-111 para todos (escolha do nosso motor por default)
+  //   'lignin'    → Eq. 20-112 (Van Soest, baseada em lignina) — DEFAULT NASEM oficial
+  //   'iv_forage' → Eq. 20-111 (DFND 48h) só forragens; lignina nos concentrados
+  //   'iv_all'    → Eq. 20-111 (DFND 48h) para todos
+  // Default 'lignin' garante que nossos números batem com o NASEM Software oficial
+  // out-of-the-box. O aluno pode trocar para 'iv_all' usando os valores da Tabela
+  // 19-1 (mais informativo) ou customizar DFND 48h dos alimentos.
   const ndf_method: NonNullable<AnimalLactacao['ndf_method']> =
-    animal.ndf_method ?? 'iv_all';
+    animal.ndf_method ?? 'lignin';
 
   let An_DEIn = 0, An_MEIn = 0, An_NEIn = 0;
   let Dt_DigNDFIn = 0, Dt_DigStIn = 0, Dt_DigFAIn = 0, An_DigCPaIn = 0, Dt_DigrOMIn = 0;
@@ -584,16 +587,29 @@ export function calcularResultados(
     // 4) CP digestion (Eq. 3-7b) — aparente
     An_DigCPaIn = Math.max(0, An_RDPIn + An_idRUPIn - (Du_MiCP - Du_idMiCP) - Fe_CPend);
 
-    // 5) rOM — Fase 1.1: Eq. 20-99 completa + APARENTE (NASEM Cap. 4).
-    //    rOM = OM − NDF − Amido − (FA × fHydr_FA) − TP − NPN_DM
+    // 5) rOM — Fase 1.1 + bug fix Fase residual.
+    //    Eq. 20-99 NASEM (`nutrient_intakes.py:204-215` e `:180-181`):
+    //      Fd_rOM = OM − Ash − NDF − St − (FA × Fd_fHydr_FA) − TP − NPN_DM
+    //    onde Fd_fHydr_FA = 1/1,06 (≈0,9434) para feeds NORMAIS e 1,0 só para
+    //    suplementos de ácido graxo puro (gorduras protegidas, sabões etc).
+    //    Era 1,06 antes — bug que subtraía 13% mais FA do que devia.
     //    Dt_DigrOMt   = kgROM × 0.96 (Fd_dcrOM)
     //    Dt_DigrOMaIn = Dt_DigrOMtIn − Fe_rOMend  (Fe_rOMend = 3,43% × DMI)
-    //    A Eq. 20-182 usa o APARENTE, não o total.
-    const fHydr_FA  = 1.06;
+    let kgFA_fHydr = 0;
+    for (const slot of slots) {
+      if (!slot.alimentoNome || slot.kgMN <= 0) continue;
+      const a = alimentos.find(x => x.nome === slot.alimentoNome);
+      if (!a) continue;
+      const kgMS_slot = slot.kgMN * a.ms;
+      const fa_frac   = a.fa ?? ((a.ee ?? 0) * 0.80);
+      const isFASupp  = a.classificacao === 'Gordura/Óleo';
+      const fHydr     = isFASupp ? 1.0 : (1 / 1.06);
+      kgFA_fHydr += fa_frac * kgMS_slot * fHydr;
+    }
     const kgTP      = Math.max(0, kgPB - kgNPN_CP);
     const kgNPN_DM  = kgNPN_CP / 2.81;
     const kgOM      = Math.max(0, totalKgMS - kgCinza);
-    const kgROM     = Math.max(0, kgOM - kgFDN - kgAMIDO - (kgFA * fHydr_FA) - kgTP - kgNPN_DM);
+    const kgROM     = Math.max(0, kgOM - kgFDN - kgAMIDO - kgFA_fHydr - kgTP - kgNPN_DM);
     const Fe_rOMend = 0.0343 * totalKgMS;     // Eq. NASEM fecal.py:24
     Dt_DigrOMIn     = Math.max(0, kgROM * 0.96 - Fe_rOMend);
 
@@ -620,8 +636,11 @@ export function calcularResultados(
        - Milk_CP_g - Body_CPgain_g - Gest_CPuse_g) / 6.25);
     const Ur_DEIn       = 0.0143 * Ur_N_g;
 
-    // 8) Gas energy — vaca lactando (Eq. 3-9 / 20-310 caso "Lactating Cow")
-    const FA_pctMS    = (kgEE / totalKgMS) * 100;
+    // 8) Gas energy — vaca lactando (Eq. 20-310, `animal.py:169-180` nasem_dairy)
+    //   An_GasEOut_Lact = 0.294 × DMI − 0.347 × (Dt_FAIn / DMI × 100) + 0.0409 × An_DigNDF
+    //   onde Dt_FAIn é FA VERDADEIRO (Fd_FA), NÃO crude fat (Fd_CFat).
+    //   An_DigNDF é dNDF / DMI × 100 (% MS).
+    const FA_pctMS    = (kgFA / totalKgMS) * 100;
     const dNDF_pctMS  = (Dt_DigNDFIn / totalKgMS) * 100;
     const An_GasEOut  = 0.294 * totalKgMS - 0.347 * FA_pctMS + 0.0409 * dNDF_pctMS;
     // Nota: redução de 5% se monensina presente (Eq. 20-310 nota) — não aplicada v1
@@ -702,7 +721,10 @@ export function calcularResultados(
     ee_insat: kgEE_INSAT / ms,
     cnf: kgCNF / ms,
     amido: kgAMIDO / ms,
-    amido_deg: kgAMIDO_DEG / ms,
+    // Amido degradável no rúmen: NASEM 2021 Eq. 20-53 (Rum_dcSt × kgAMIDO).
+    // O legado kgAMIDO_DEG via kd_amido/(kd+kP) per-feed só funcionava se kd_amido
+    // estivesse preenchido (T19-1 NASEM não publica), então 0 na prática.
+    amido_deg: Rum_DigStIn / ms,
     met: kgMET / ms,
     lys: kgLYS / ms,
     ca: kgCA / ms,
@@ -728,7 +750,9 @@ export function calcularResultados(
     levedura: kgLEVEDURA / ms,
     fdnf_kg_pv: animal.peso > 0 ? kgFDNF / animal.peso : 0,
     pct_forragem_ms: ms > 0 ? kgMS_forragem / ms : 0,
-    fdn8_amido_deg: kgAMIDO_DEG > 0 && kgFDN8 > 0 ? kgFDN8 / kgAMIDO_DEG : 0,
+    // FDN>8 / Amido degradável (indicador de fibra física vs amido ruminal).
+    // Só calcula se aluno preencher mn8 (PSPS) em algum alimento custom.
+    fdn8_amido_deg: Rum_DigStIn > 0 && kgFDN8 > 0 ? kgFDN8 / Rum_DigStIn : 0,
     lis_met: kgMET > 0 ? kgLYS / kgMET : 0,
     ca_p: kgP > 0 ? kgCA / kgP : 0,
     dcad,

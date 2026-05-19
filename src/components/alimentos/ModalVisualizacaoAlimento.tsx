@@ -111,7 +111,7 @@ export default function ModalVisualizacaoAlimento({ alimento, onUsarComoBase, on
               <CampoRO label="Fração C"         sufixo="%PB"  valor={fmtLock(alimento.prot_c)}      lock />
               <CampoRO label="Kd (Fração B)"    sufixo="%/h"  valor={fmtLock(alimento.kd_prot)}     lock />
               <CampoRO label="Digest. RUP"      sufixo="%"    valor={alimento.rup_digest !== null && alimento.rup_digest !== undefined ? (alimento.rup_digest * 100).toFixed(2) : '—'} lock />
-              <CampoRO label="IVNDFD48"         sufixo="%FDN" valor={fmtLock(alimento.ivndfd48)}    lock />
+              <CampoRO label="DFND 48h"         sufixo="%FDN" valor={fmtLock(alimento.ivndfd48)}    lock />
               <CampoRO label="Prot. Solúvel"    sufixo="%PB"  valor={alimento.soluble_protein !== null && alimento.soluble_protein !== undefined ? (alimento.soluble_protein * 100).toFixed(2) : '—'} lock />
               <CampoRO label="ADIP"             sufixo="% MS" valor={pct(alimento.adip)} lock />
               <CampoRO label="NDIP"             sufixo="% MS" valor={pct(alimento.ndip)} lock />

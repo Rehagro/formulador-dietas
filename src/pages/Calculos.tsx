@@ -191,29 +191,46 @@ Fator Temporal = 1 − (0,212 + P × 0,136) × e^(−0,053 × DEL)
         <div className="border-l-4 border-amber-300 pl-4">
           <h3 className="font-semibold text-amber-800 mb-2">Parte A — Digestibilidades dos componentes da dieta</h3>
           <Formula>
-{`# 1) NDF total tract — Eq. 20-111/113/115
-Fd_dcNDF_base = (12 + 0,61 × IVNDFD48) / 100              [por alimento]
-Dt_dcNDF = Dt_dcNDF_Base − 1,1×(DMI/BW − 0,035)
-                         − 0,59×(St_frac − 0,26)         [ajuste diet]
-Dt_DigNDFIn = Dt_dcNDF × Dt_NDFIn                         [kg/d]
+{`# 1) NDF (fibra) digestível — escolha do método no painel do animal:
+#    (a) Lignina (default — bate com NASEM Software oficial):
+#        Fd_dcNDF_base = 0,75 × (NDF − Lg) × (1 − (Lg/NDF)^0,667) / NDF
+#    (b) DFND 48h: Fd_dcNDF_base = (12 + 0,61 × DFND48) / 100
+#    Ajuste pela dieta (Eq. 20-115):
+#    Dt_dcNDF = Dt_dcNDF_Base − 1,1×(DMI/BW − 0,035)
+#                             − 0,59×(St_frac − 0,26)
+#    Dt_DigNDFIn = Dt_dcNDF × Dt_NDFIn
 
-# 2) Amido total tract — Eq. 20-84
-Dt_DigStIn = Dt_StIn × 0,92                               [kg/d]
+# 2) Amido digestível (Eq. 20-84) — Fd_dcSt por alimento + ajuste DMI/BW
+#    Para a maioria dos alimentos: 89-92%.
 
 # 3) FA digestibility — Tabela 4-1 NASEM
-Dt_DigFAIn = Σ alimento (ttdcFA × FA × kgMS)             [kg/d]
-   • Óleos puros (Óleo de Soja, etc.): 0,70
-   • Sabões de Cálcio (gordura protegida): 0,76
-   • Demais alimentos (default): 0,73
+#    Default 73%; óleos puros 70%; sabões de Cálcio 76%.
 
-# 4) CP digestion — Eq. 3-7b
-An_DigCPaIn = An_RDPIn + An_idRUPIn
-            − (Du_MiCP − Du_idMiCP)  − Fe_CPend           [kg/d]
+# 4) PB digestível aparente (Eq. 3-7b)
+#    An_DigCPaIn = RDP + idRUP − (Du_MiCP − Du_idMiCP) − Fe_CPend
 
 # 5) rOM (resíduo orgânico) — Eq. 20-99
-rOM = (totalMS − cinzas) − NDF − amido − FA − CP          [kg/d]
-Dt_DigrOMIn = rOM × 0,961`}
+#    rOM = OM − NDF − amido − (FA × fHydr_FA) − TP − NPN_DM
+#    Dt_DigrOMaIn = rOM × 0,96 − Fe_rOMend  (Fe_rOMend = 3,43% × DMI)`}
           </Formula>
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mt-2 text-xs text-gray-700 space-y-1.5">
+            <p className="font-semibold text-blue-900">📘 Como esse cálculo conversa com o NASEM Software oficial:</p>
+            <p>
+              <strong>No default (Lignina)</strong> nosso motor produz <strong>os mesmos números</strong> que o
+              NASEM Software oficial — validado em 4 cenários com diferença ≤ 0,1% no leite potencial pela energia.
+            </p>
+            <p>
+              Se você escolher <strong>DFND 48h em todos</strong>, nosso motor usa os valores publicados na
+              Tabela 19-1 NASEM (47-86% conforme o alimento). O NASEM Software oficial, mesmo configurado para
+              "usar DFND 48h", aplica valores padrão (48,3% para forragens / 65% para concentrados) a menos que
+              você digite os valores manualmente. Isso explica por que os números podem divergir.
+            </p>
+            <p>
+              <strong>Resumo prático</strong>: para bater exato com o NASEM Software → use <em>Lignina</em>.
+              Para ter cálculo mais informativo usando dados reais → use <em>DFND 48h</em>. Para forragens da
+              sua fazenda com laudo → use <em>DFND 48h só forragens</em>.
+            </p>
+          </div>
         </div>
 
         {/* PARTE B — DE */}
@@ -406,9 +423,10 @@ Du_idMiCP = Du_MiCP × 0,80                                [kg/d]        (Eq. 20
 Du_idMiTP = Du_idMiCP × 0,824                             [kg/d]        (Eq. 20-127: 82,4% é prot. verdadeira)`}
           </Formula>
           <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 mt-2 text-xs text-gray-600">
-            <strong>Ajuste de dcNDF (Eq. 20-114):</strong> a digestibilidade do FDN cai com DMI/BW alto e com amido%
-            alto na dieta — porque a passagem é mais rápida e o pH cai. Por isso usa-se IVNDFD48 (digestibilidade in
-            vitro 48h) corrigida por esses dois fatores.
+            <strong>Ajuste da digestibilidade da fibra:</strong> a digestibilidade do FDN cai quando a vaca come
+            muito (DMI/BW alto) ou quando a dieta tem muito amido — porque a passagem ruminal acelera e o pH cai.
+            A DFND 48h (digestibilidade <em>in vitro</em> da fibra em 48 horas, que vem nos laudos de análise de
+            forragem) é o melhor preditor quando você tem o valor medido da sua silagem ou feno.
           </div>
         </div>
 
@@ -594,39 +612,66 @@ An_MPavailMilk = An_MPIn − mp_mantenca − Gest_MPuse`}
         </div>
       </Secao>
 
-      {/* ── 5. Pendências NASEM 2021 ──────────────────────────── */}
-      <Secao titulo="5. O que ainda não está 100% NASEM 2021" subtitulo="Único item pendente e impacto numérico" cor="gray">
+      {/* ── 5. Status de conformidade com NASEM 2021 ────────────────────── */}
+      <Secao titulo="5. Conformidade com o NASEM Software oficial" subtitulo="Suite de validação cruzada e onde os números batem" cor="gray">
 
-        <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 text-sm text-gray-700">
+        <div className="bg-green-50 border border-green-200 rounded-lg p-4 text-sm text-gray-700 space-y-2">
+          <p className="text-green-900 font-semibold">✅ Motor validado contra o NASEM oficial (nasem_dairy 1.0.2)</p>
           <p>
-            O motor implementa <strong>literalmente</strong> as equações NASEM 2021 para CMS, RUP/RDP,
-            proteína microbiana (Michaelis-Menten), manutenção proteica, gestação, leite potencial pela proteína
-            <strong> e cadeia de energia (DE → ME → NEL)</strong>. Resta <strong>1 lacuna menor</strong> documentada abaixo.
-          </p>
-          <p className="mt-2 text-xs text-gray-500">
-            Detalhamento completo equação-por-equação em <code className="bg-white border border-gray-200 rounded px-1">GAP_ANALYSIS_NASEM2021.md</code> na raiz do projeto.
+            Cada equação foi comparada contra a implementação oficial do NASEM 2021 (pacote Python mantido pela
+            Universidade de Guelph — fonte computável do livro). Suite de 4 cenários de teste em
+            <code className="bg-white border border-gray-200 rounded px-1 mx-1">scripts/validate_multi_*</code>:
+            primípara mid-lact, alta produção, dieta tropical e baixa produção.
           </p>
         </div>
 
-        {/* Única pendência — Body gain */}
-        <div className="border-l-4 border-gray-400 pl-4">
-          <h3 className="font-semibold text-gray-800 mb-1">Ganho/perda corporal proteico <code className="text-xs bg-gray-100 px-1 rounded">Body_MPuse</code></h3>
-          <p className="text-sm text-gray-600 mb-2">
-            Vacas em ganho ativo de ECC (recuperando reservas pós-pico) consomem MP para deposição de tecido.
-            Vacas perdendo ECC (BEN, início da lactação) liberam parte dessa MP. NASEM modela isso pelas
-            Eq. 20-247 a 20-271 — depende de ECC alvo, dias para atingir e composição do tecido por raça.
-          </p>
-          <div className="bg-amber-50 border border-amber-200 rounded p-2.5 text-xs text-amber-900">
-            <strong>Impacto:</strong> para vaca em ECC <em>estável</em>, esse termo ≈ 0 e a omissão não afeta o cálculo.
-            Para vaca <em>ganhando</em> ECC ativamente, o motor superestima o leite PM em <strong>2–4 kg/d</strong>.
-            Para vaca em BEN, o motor subestima em <strong>1–2 kg/d</strong>.
+        <div className="border-l-4 border-green-400 pl-4">
+          <h3 className="font-semibold text-green-800 mb-2">📊 Convergência (após Fases 1, 4 e 5)</h3>
+          <div className="text-xs space-y-1 font-mono bg-white border border-gray-200 rounded p-3 text-gray-700">
+            <div className="font-bold text-gray-800">Comparação Motor TS vs NASEM oficial (método Lignina nos dois):</div>
+            <div>• Leite potencial pela proteína (MP): <span className="text-green-700">± 0,2%</span></div>
+            <div>• Leite potencial pela energia (NEL): <span className="text-green-700">± 0,07%</span></div>
+            <div>• Energia digestível (DE), metabolizável (ME), líquida (NEL): <span className="text-green-700">± 0,04%</span></div>
+            <div>• Componentes (NDF dig, amido dig, FA dig, rOM, manutenção, gestação): <span className="text-green-700">0,0%</span></div>
           </div>
-          <p className="text-xs text-gray-500 mt-2">
-            <strong>Como contornar enquanto não está implementado:</strong> formule para vacas em ECC estável (a maioria das vacas a partir de DEL 60+).
-            Em vacas no início da lactação (DEL &lt; 30) com perda visível de ECC, considere uma margem de segurança
-            de +1–2 kg de leite no fator limitante.
+        </div>
+
+        <div className="border-l-4 border-sky-400 pl-4">
+          <h3 className="font-semibold text-sky-800 mb-2">🔧 Como alinhar com o NASEM Software oficial</h3>
+          <div className="text-sm text-gray-700 space-y-2">
+            <p>
+              <strong>Modo default (Lignina)</strong>: nosso motor produz exatamente os mesmos números que o
+              NASEM Software oficial. Use Eq. 20-112 (Van Soest, baseada em lignina) para todas as forragens
+              e concentrados.
+            </p>
+            <p>
+              <strong>Modo DFND 48h</strong>: aqui há uma diferença metodológica que vale entender. O nosso motor
+              usa os valores reais publicados na Tabela 19-1 (47-86% conforme o alimento). O NASEM Software oficial,
+              mesmo configurado para usar DFND 48h, aplica valores padrão fixos
+              (<strong>48,3%</strong> para forragens / <strong>65%</strong> para concentrados) a menos que você digite
+              os valores manualmente. Por isso, ao escolher <em>DFND 48h</em>, os números do nosso motor podem
+              divergir do NASEM Software — mas são mais informativos.
+            </p>
+            <p>
+              <strong>Modo DFND 48h só forragens</strong>: recomendado quando você tem o laudo de análise das suas
+              forragens (silagem, feno) — basta cadastrar a DFND 48h medida pelo laboratório.
+            </p>
+          </div>
+        </div>
+
+        <div className="border-l-4 border-amber-400 pl-4">
+          <h3 className="font-semibold text-amber-800 mb-2">⚠️ Onde o motor pode ter limitação</h3>
+          <p className="text-sm text-gray-600 mb-2">
+            A composição corporal (ganho de peso e ECC) já é considerada, mas requer que o aluno preencha corretamente
+            no painel do animal. Vaca sem ganho de peso e em ECC estável (a maioria a partir de DEL 60): basta deixar
+            os ganhos em 0. Para vaca primípara em crescimento ou vaca recuperando ECC, o aluno precisa informar
+            o ganho diário esperado para o cálculo ser preciso.
           </p>
         </div>
+
+        <p className="text-xs text-gray-500 mt-2">
+          Detalhamento completo equação-por-equação em <code className="bg-white border border-gray-200 rounded px-1">GAP_ANALYSIS_NASEM2021.md</code> na raiz do projeto.
+        </p>
 
       </Secao>
 

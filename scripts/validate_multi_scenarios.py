@@ -204,6 +204,7 @@ def feed_to_alimento(name, tipo):
         'ms': f('Fd_DM',100), 'pb': pb_frac,
         'fdn': f('Fd_NDF',100), 'fda': f('Fd_ADF',100),
         'amido': f('Fd_St',100), 'ee': f('Fd_CFat',100), 'cinza': f('Fd_Ash',100),
+        'lignin': f('Fd_Lg',100),    # necessário para Eq. 20-112
         # Campos novos Fase 1
         'fa':       f('Fd_FA',100),
         'dc_st':    f('Fd_dcSt'),

@@ -1,0 +1,30 @@
+{
+  "A_lact_test": {
+    "An_DEIn": 72.89930792593672,
+    "An_MEIn": 59.97591601097345,
+    "Dt_DigNDFIn": 3.776616956919395,
+    "Mlk_Prod_NEalow": 31.261173866016268,
+    "Mlk_Prod_MPalow": 35.906473271934885
+  },
+  "B_high_prod": {
+    "An_DEIn": 83.19688137398059,
+    "An_MEIn": 72.08277156447159,
+    "Dt_DigNDFIn": 3.6809479300287773,
+    "Mlk_Prod_NEalow": 45.42285590186189,
+    "Mlk_Prod_MPalow": 45.0810205613241
+  },
+  "C_tropical": {
+    "An_DEIn": 57.19028503358102,
+    "An_MEIn": 48.42197512383025,
+    "Dt_DigNDFIn": 3.395726827915977,
+    "Mlk_Prod_NEalow": 26.982320273122962,
+    "Mlk_Prod_MPalow": 30.53038222921923
+  },
+  "D_low_prod": {
+    "An_DEIn": 54.52758843044031,
+    "An_MEIn": 47.03217347830014,
+    "Dt_DigNDFIn": 2.959183209291774,
+    "Mlk_Prod_NEalow": 22.812303140251018,
+    "Mlk_Prod_MPalow": 21.92114356566732
+  }
+}

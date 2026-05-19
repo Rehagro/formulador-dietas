@@ -287,7 +287,7 @@ export default function ModalEdicaoAlimento({
               <CampoLock label="Fração C"            sufixo="%PB"  valor={alimentoBase.prot_c} />
               <CampoLock label="Kd (Fração B)"       sufixo="%/h"  valor={alimentoBase.kd_prot} />
               <CampoLock label="Digest. intestinal RUP" sufixo="%" valor={alimentoBase.rup_digest !== null && alimentoBase.rup_digest !== undefined ? alimentoBase.rup_digest * 100 : null} />
-              <CampoLock label="IVNDFD48"            sufixo="%FDN" valor={alimentoBase.ivndfd48} />
+              <CampoLock label="DFND 48h"            sufixo="%FDN" valor={alimentoBase.ivndfd48} />
               <CampoLock label="Prot. Solúvel"       sufixo="%PB"  valor={alimentoBase.soluble_protein !== null && alimentoBase.soluble_protein !== undefined ? alimentoBase.soluble_protein * 100 : null} />
               <CampoLock label="ADIP"                sufixo="% MS" valor={alimentoBase.adip !== null && alimentoBase.adip !== undefined ? alimentoBase.adip * 100 : null} />
               <CampoLock label="NDIP"                sufixo="% MS" valor={alimentoBase.ndip !== null && alimentoBase.ndip !== undefined ? alimentoBase.ndip * 100 : null} />
