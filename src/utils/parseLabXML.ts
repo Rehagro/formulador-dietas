@@ -132,8 +132,8 @@ export function parseLabXML(xmlContent: string): ParsedLabXML {
   const NDFkd        = num(get('NDFkd'));            // %/h
   const Starchkd     = num(get('Starchkd'));         // %/h
   const NDFDom30h    = num(get('NDFDom_IV_30hr'));   // %NDFom
-  const NDFDom120h   = num(get('NDFDom_IV_120hr'));  // %NDFom
-  const NDFDom240h   = num(get('NDFDom_IV_240hr'));  // %NDFom
+  // NDFDom120h e NDFDom240h existem no XML mas não usados hoje (futuro: gráfico de
+  // curva de digestibilidade pedagógico).
   const uNDF240      = num(get('uNDF240'));          // %DM
   // NDT (Milk 2006 TDN) — quando disponível
   const TDN_pct      = num(get('Milk2006_TDN'));     // %
