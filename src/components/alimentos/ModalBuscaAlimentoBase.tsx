@@ -34,7 +34,7 @@ export default function ModalBuscaAlimentoBase({ alimentos, onSelecionar, onCanc
     t === 'F' ? 'bg-green-100 text-green-700' : 'bg-purple-100 text-purple-700';
 
   return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-start justify-center overflow-y-auto py-8">
+    <div className="fixed inset-0 bg-black/50 z-[60] flex items-start justify-center overflow-y-auto py-8">
       <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl mx-4">
         <div className="flex items-start justify-between p-5 border-b border-gray-100">
           <div className="min-w-0">

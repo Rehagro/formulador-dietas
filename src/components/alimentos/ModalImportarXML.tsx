@@ -73,7 +73,7 @@ export default function ModalImportarXML({ alimentos, onConfirmar, onCancelar }:
   // ─── Etapa 1: upload ──────────────────────────────────────────────────────
   if (!parsed) {
     return (
-      <div className="fixed inset-0 bg-black/50 z-50 flex items-start justify-center overflow-y-auto py-8">
+      <div className="fixed inset-0 bg-black/50 z-[60] flex items-start justify-center overflow-y-auto py-8">
         <div className="bg-white rounded-xl shadow-xl w-full max-w-xl mx-4">
           <div className="flex items-start justify-between p-5 border-b border-gray-100">
             <div>
@@ -151,7 +151,7 @@ export default function ModalImportarXML({ alimentos, onConfirmar, onCancelar }:
   // ─── Etapa 2: preview + escolha de template ────────────────────────────────
   const m = parsed.metadata;
   return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-start justify-center overflow-y-auto py-8">
+    <div className="fixed inset-0 bg-black/50 z-[60] flex items-start justify-center overflow-y-auto py-8">
       <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl mx-4">
         <div className="flex items-start justify-between p-5 border-b border-gray-100">
           <div>

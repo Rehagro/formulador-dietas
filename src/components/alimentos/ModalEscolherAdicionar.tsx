@@ -12,7 +12,7 @@ interface Props {
  */
 export default function ModalEscolherAdicionar({ onClonar, onImportarXML, onFechar }: Props) {
   return (
-    <div className="fixed inset-0 z-50 bg-black/30 backdrop-blur-sm flex items-center justify-center p-4"
+    <div className="fixed inset-0 z-[60] bg-black/30 backdrop-blur-sm flex items-center justify-center p-4"
          onClick={onFechar}>
       <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full p-5"
            onClick={e => e.stopPropagation()}>

@@ -55,7 +55,7 @@ export default function ModalVisualizacaoAlimento({ alimento, onUsarComoBase, on
     : <span className="bg-green-100 text-green-700 text-[10px] font-bold px-2 py-0.5 rounded-full">Customizado</span>;
 
   return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-start justify-center overflow-y-auto py-8">
+    <div className="fixed inset-0 bg-black/50 z-[60] flex items-start justify-center overflow-y-auto py-8">
       <div className="bg-white rounded-xl shadow-xl w-full max-w-3xl mx-4">
         <div className="flex items-center justify-between p-5 border-b border-gray-100">
           <div className="min-w-0 flex items-center gap-2">
