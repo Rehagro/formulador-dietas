@@ -257,7 +257,7 @@ Mlk_NP_g = −97,0 + 1,68 × Abs_His + 0,885 × Abs_Ile
 - **Eq. 20-185 (a) — `mPrt_eqn` selector** — selecionar entre Eq. 20-185 mecanística e Eq. 20-339 estática.
 - **Eq. 20-308 — Perda urinária DE** (`Ur_DEIn = 0,0143 × Ur_N_g`) — pequena (~0,3 Mcal/d), parte de 3.3.
 - **Eq. 20-310 — `An_GasEOut`** — perda de metano CH4, parte de 3.3. Sensível à dieta.
-- **Indicador `fator_limitante` revisado** — hoje sempre dá "energia" (NEL=0). Após 3.3, vai funcionar.
+- ~~**Indicador `fator_limitante` revisado**~~ — ✅ resolvido junto com §3.3 em 2026-05-18. Agora funciona corretamente comparando Leite_NEL e Leite_PM reais.
 
 ---
 
