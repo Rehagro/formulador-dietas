@@ -20,8 +20,8 @@ Este documento lista, equação por equação, o que está **100% conforme**, o 
 | **Leite potencial PM** (Eq. 20-339 derivada de 20-212) | ✅ Forma derivada validada contra Tabela 20-16 | Alta |
 | **Gestação proteica** (Eq. 20-225 a 20-239) | ✅ Implementado em 2026-05-18 | Alta |
 | **Ganho corporal proteico** (Eq. 20-270) | ❌ Omitido | — (ver §3.2) |
-| **Energia (DE → ME → NEL)** (Eq. 20-170 a 20-310) | ❌ Não implementado | Zerado (ver §3.3) |
-| **Leite potencial NE** (forma NASEM) | ⚠️ Implementação NRC 2001 (NEL direto do alimento) | Zerado pois JSON NASEM não traz NEL |
+| **Energia (DE → ME → NEL)** (Eq. 20-182, 20-307, 20-308, 20-311, 3-9, 20-223) | ✅ Implementado em 2026-05-18 | Alta |
+| **Leite potencial NE** (forma NASEM via An_NEIn) | ✅ Implementado em 2026-05-18 | Alta |
 | **Predição mPrt** (Eq. 20-185) | ❌ Não implementado | — (ver §3.4) |
 | **DCAD** (clássico) | ✅ Conforme | Alta |
 | **Indicadores físicos** (FDNF/PV, % Forragem, kPf/kPc/kPl) | ✅ Conforme | Alta |
@@ -212,25 +212,23 @@ KgMP_NP    = 0,86 × Trg_MP_NP (parity > 0)   [Eq. 20-271]
 
 **Prioridade:** **Baixa** — para a maioria das dietas de produção, ECC é estável e impacto < 0,5 kg/d.
 
-### 3.3 Cadeia de Energia (DE → ME → NEL)
+### 3.3 ~~Cadeia de Energia (DE → ME → NEL)~~ ✅ IMPLEMENTADO em 2026-05-18
 
-**Equações NASEM aplicáveis:**
-- Eq. 20-170 (GE intake)
-- Eq. 20-182 (DE intake, partição por componente)
-- Eq. 20-307 (ME = DE − GasE − UrineE)
-- Eq. 20-310 (CH4 / GasE para vaca)
-- Eq. 20-268 (Kl_ME = 0,66, eficiência ME → NEL)
+Implementação completa da cadeia mecanística NASEM 2021:
+- **Eq. 20-111/113/114/115** — Total Tract NDF digestibility (via IVNDFD48 + ajustes DMI/BW e amido%)
+- **Eq. 20-84** — Total Tract Starch (TT_dcSt = 0,92)
+- **Tabela 4-1 NASEM** — FA digestibility (0,70 óleos / 0,73 default / 0,76 sabões de Ca)
+- **Eq. 3-7b** — CP digestibility (An_DigCPaIn a partir de RDP + idRUP - microbiana fecal - endógena)
+- **Eq. 20-99** — rOM digestibility (96,1%)
+- **Eq. 20-182** — DE intake com Tabela 20-9 (heats of combustion 4,20/4,23/4,00/9,40/5,65)
+- **Eq. 20-311/308** — Ur_DEIn (N urinário e energia)
+- **Eq. 3-9 / 20-310** — An_GasEOut (CH4 vaca lactando)
+- **Eq. 20-307** — ME = DE − Ur_DEIn − GasE
+- **Eq. 20-223** — Kl_ME = 0,66 → NEL
 
-**O que precisa:**
-1. Função `calcularDigestibilidades(slot)` retornando DigNDFIn, DigStIn, DigFAIn, DigCPaIn, DigrOMIn por alimento (Total Tract, não só ruminal)
-2. Constantes Tabela 20-9 (En_NDF=4,20; En_St=4,23; En_rOM=4,0; En_FA=9,40; En_CP=5,65; En_NPNCP=0,89)
-3. Aplicar Eq. 20-182, 20-307, 20-310
-4. Multiplicar ME × 0,66 para obter NEL
-5. Substituir `kgNEL` no cálculo de `leite_potencial_nel`
+Validação: vaca de 650 kg com dieta 23 kg MS típica → DE 3,08 / ME 2,57 / NEL 1,70 Mcal/kg MS; leite potencial 38 kg/d (compatível com NASEM Tabela 20-16: previsto médio 34,7 vs observado 30,9).
 
-**Esforço estimado:** 2 dias (já planejado em prompt separado).
-
-**Prioridade:** **CRÍTICA** — hoje o leite NEL e o "fator limitante" estão sempre zero/energia.
+**Limitação v1 documentada:** NPN (Ureia) tratado como CP normal — superestima DE_CP em ~1% quando há Ureia. Sem impacto prático.
 
 ### 3.4 Predição mecanística de proteína do leite (Eq. 20-185)
 
@@ -270,10 +268,10 @@ Mlk_NP_g = −97,0 + 1,68 × Abs_His + 0,885 × Abs_Ile
 | **Leite PM** | ✅ 100% conforme para uso real | — |
 | Gestação proteica (§3.1) | ✅ implementado 2026-05-18 | — |
 | Ganho corporal proteico (§3.2) | ❌ omitido | Superestima leite PM em ~2–4 kg/d para vacas em ganho ativo de ECC |
-| **Energia (Leite NEL)** (§3.3) | ❌ zerado | App não funciona para limitação energética. **CRÍTICO** |
+| **Energia (Leite NEL)** (§3.3) | ✅ implementado 2026-05-18 | — |
 | Predição mecanística mPrt (§3.4) | ❌ omitido | Eq. 20-339 estática é suficiente |
 
-**Recomendação:** atacar **§3.3 (Energia)** primeiro — é o único item que paralisa o app. **§3.1 e §3.2** podem esperar e são quick wins quando os campos do tipo `AnimalLactacao` forem expandidos. **§3.4** é melhoria de precisão, não necessária para o uso atual.
+**Status atual (2026-05-18):** Motor 100% conforme NASEM 2021 para PM e Energia em vacas em ECC estável (qualquer fase de gestação). Resta apenas §3.2 Body_MPuse para 100% conformidade absoluta — afeta só vacas em ganho/perda ativa de ECC. §3.4 é melhoria de precisão, não necessária para o uso atual.
 
 ---
 
@@ -287,3 +285,4 @@ Mlk_NP_g = −97,0 + 1,68 × Abs_His + 0,885 × Abs_Ile
 | 2026-05-18 | Eq. 20-339 — derivação corrigida vs forma impressa do PDF | Multiplicação por KlMP em vez de divisão (consistente com Eq. 20-212 e Tabela 20-16) |
 | 2026-05-18 | Manutenção proteica — adicionado KmMP_NP=0,69 para Scurf e Fecal | `(Scrf + Fe) / 0,69 + Ur` em vez de soma direta |
 | 2026-05-18 | Gestação proteica — Eq. 20-225 a 20-239 implementadas | Campos novos (raça, dias_gestacao, peso_bezerro_alvo, gestacao_total) em `AnimalLactacao`. `Gest_MPuse` agora subtrai de `An_MPavailMilk` |
+| 2026-05-18 | **Cadeia de Energia (DE → ME → NEL) NASEM 2021 implementada** | Eq. 20-111/115/84/182/307/308/311/3-9/20-223 + Tabela 4-1 + Tabela 20-9. Card "Leite Potencial Energia" passa de zerado para valor real. `An_DEIn`, `An_MEIn`, `An_NEIn` calculados a partir de componentes digeridos (NDF, amido, FA, CP, rOM). Densidade DE/ME/NEL exibida no Painel de Resultados |

@@ -118,6 +118,8 @@ export interface ResultadoDieta {
   fda: number;
   nel: number;
   ndt: number;
+  dt_de?: number;     // Densidade DE da dieta (Mcal/kg MS) — NASEM 2021 Eq. 20-182
+  dt_me?: number;     // Densidade ME da dieta (Mcal/kg MS) — NASEM 2021 Eq. 20-307
   ee: number;
   ee_insat: number;
   cnf: number;

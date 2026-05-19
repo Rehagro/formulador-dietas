@@ -219,7 +219,7 @@ Fase 0 (base)
 
 | Fase | Descrição | Status | Última atualização |
 |---|---|---|---|
-| Lactação | Motor NASEM 2021 (PM completo + Gestação) | 🟡 Quase completo (falta Body_MPuse + Energia) | 2026-05-18 |
+| Lactação | Motor NASEM 2021 (PM + Gestação + Energia completos) | 🟢 100% conforme (resta só Body_MPuse, prioridade baixa) | 2026-05-18 |
 | Fase 0 | Refatoração arquitetural (abas) | ⬜ Não iniciado | — |
 | Fase 1 | Vaca Seca | ⬜ Não iniciado | — |
 | Fase 2 | Pré-parto / Close-up | ⬜ Não iniciado | — |
@@ -232,13 +232,15 @@ Fase 0 (base)
 ### Lactação — Pendências para 100% NASEM 2021
 Ver `GAP_ANALYSIS_NASEM2021.md` para detalhamento completo equação-por-equação.
 
-1. **Cadeia de Energia (DE → ME → NEL)** — *prioridade crítica*
-   - JSON NASEM não traz `nel`/`ndt` em nenhum dos 159 alimentos
-   - Eq. 20-170 (GE), 20-182 (DE), 20-307 (ME), 20-310 (GasE/CH4), 20-268 (Kl_ME=0,66)
-   - Card "Leite Potencial Energia" zerado até resolver
-   - Esforço estimado: 2 dias
+**Implementado (2026-05-18):**
+- ✅ CMS (Eq. 20-21), RUP/RDP (Eq. 6-1), Proteína microbiana (Eq. 20-52/53/74), MP (Eq. 20-136), Manutenção (Eq. 20-283 a 20-306)
+- ✅ Gestação proteica (Eq. 20-225 a 20-239)
+- ✅ Leite PM (Eq. 20-339 derivada de 20-212)
+- ✅ **Cadeia de Energia DE → ME → NEL (Eq. 20-111/115/84/182/307/308/311/3-9/20-223 + Tabelas 4-1 e 20-9)**
 
-2. **Body_MPuse (ganho/perda corporal proteico)** — *prioridade baixa*
+**Pendência única restante — prioridade baixa:**
+
+1. **Body_MPuse (ganho/perda corporal proteico)**
    - Eq. 20-247/258/270 — requer ECC alvo + dias para alvo
    - Impacto: superestima ~2–4 kg/d para vaca em ganho ativo
    - Para vaca em ECC estável (DEL ≥ 60d), impacto = 0

@@ -171,59 +171,157 @@ Fator Temporal = 1 − (0,212 + P × 0,136) × e^(−0,053 × DEL)
       </Secao>
 
       {/* ── 2. Leite pela Energia ─────────────────────────────────────── */}
-      <Secao titulo="2. Leite Potencial pela Energia (NEL)" subtitulo="NASEM 2021 — Eq. 3-13 e 3-14a" cor="amber">
+      <Secao titulo="2. Leite Potencial pela Energia (NEL)" subtitulo="NASEM 2021 — cadeia DE → ME → NEL (Cap. 20 e Eq. 3-13)" cor="amber">
 
         <div>
           <h3 className="font-semibold text-gray-800 mb-1">O que calcula</h3>
-          <p className="text-sm text-gray-600">
-            A produção máxima de leite que a <strong>energia da dieta</strong> sustenta, depois de descontada a manutenção.
-            Conceitualmente: tudo que entra de energia primeiro paga manutenção, e o que sobrar vai para o leite.
+          <p className="text-sm text-gray-600 leading-relaxed">
+            A produção máxima de leite que a <strong>energia da dieta</strong> sustenta. Diferente do NRC 2001 (que usava NEL
+            direto do alimento), o NASEM 2021 calcula a energia a partir dos <strong>componentes digeridos</strong> (NDF, amido,
+            FA, CP, rOM), construindo a cadeia mecanística <strong>GE → DE → ME → NEL</strong>.
           </p>
+          <ul className="text-sm text-gray-600 list-disc pl-5 mt-1.5 space-y-0.5">
+            <li><strong>DE</strong> — Energia Digestível: GE menos energia das fezes (o que o animal absorveu)</li>
+            <li><strong>ME</strong> — Energia Metabolizável: DE menos perda de urina e de gases (metano)</li>
+            <li><strong>NEL</strong> — Energia Líquida de Lactação: ME × 0,66 (eficiência de uso para leite)</li>
+          </ul>
         </div>
 
-        <div>
-          <h3 className="font-semibold text-gray-800 mb-2">Fórmula</h3>
+        {/* PARTE A — Digestibilidades por componente */}
+        <div className="border-l-4 border-amber-300 pl-4">
+          <h3 className="font-semibold text-amber-800 mb-2">Parte A — Digestibilidades dos componentes da dieta</h3>
           <Formula>
-{`# Energia total da dieta
-NEL_total     = Σ (NEL_alimento × kgMS_alimento)         [Mcal/d]
+{`# 1) NDF total tract — Eq. 20-111/113/115
+Fd_dcNDF_base = (12 + 0,61 × IVNDFD48) / 100              [por alimento]
+Dt_dcNDF = Dt_dcNDF_Base − 1,1×(DMI/BW − 0,035)
+                         − 0,59×(St_frac − 0,26)         [ajuste diet]
+Dt_DigNDFIn = Dt_dcNDF × Dt_NDFIn                         [kg/d]
 
-# Manutenção (NASEM 2021 Eq. 3-13)
-NEL_mantença  = 0,10 × PV^0,75                            [Mcal/d]
+# 2) Amido total tract — Eq. 20-84
+Dt_DigStIn = Dt_StIn × 0,92                               [kg/d]
 
-# Energia disponível para leite
-NEL_leite     = NEL_total − NEL_mantença
+# 3) FA digestibility — Tabela 4-1 NASEM
+Dt_DigFAIn = Σ alimento (ttdcFA × FA × kgMS)             [kg/d]
+   • Óleos puros (Óleo de Soja, etc.): 0,70
+   • Sabões de Cálcio (gordura protegida): 0,76
+   • Demais alimentos (default): 0,73
 
-# Energia por kg de leite (Eq. 3-14a)
-NEL_por_kg    = 0,0929×G + 0,055×PB + 0,0395×Lact         [Mcal/kg]
+# 4) CP digestion — Eq. 3-7b
+An_DigCPaIn = An_RDPIn + An_idRUPIn
+            − (Du_MiCP − Du_idMiCP)  − Fe_CPend           [kg/d]
+
+# 5) rOM (resíduo orgânico) — Eq. 20-99
+rOM = (totalMS − cinzas) − NDF − amido − FA − CP          [kg/d]
+Dt_DigrOMIn = rOM × 0,961`}
+          </Formula>
+        </div>
+
+        {/* PARTE B — DE */}
+        <div className="border-l-4 border-amber-300 pl-4">
+          <h3 className="font-semibold text-amber-800 mb-2">Parte B — DE (Energia Digestível)</h3>
+          <p className="text-sm text-gray-600 mb-2">
+            Cada componente digerido contribui com sua energia bruta (heats of combustion da <strong>Tabela 20-9</strong>):
+          </p>
+          <Formula>
+{`# Eq. 20-182 — DE total
+An_DEIn = Dt_DigNDFIn × 4,20     ← NDF
+        + Dt_DigStIn  × 4,23     ← Amido
+        + Dt_DigFAIn  × 9,40     ← Ácidos Graxos
+        + An_DigCPaIn × 5,65     ← Proteína
+        + Dt_DigrOMIn × 4,00     ← Resíduo orgânico
+                                                          [Mcal/d]`}
+          </Formula>
+        </div>
+
+        {/* PARTE C — ME */}
+        <div className="border-l-4 border-amber-300 pl-4">
+          <h3 className="font-semibold text-amber-800 mb-2">Parte C — ME (Energia Metabolizável)</h3>
+          <p className="text-sm text-gray-600 mb-2">
+            Subtrai energia perdida na urina (N urinário) e em gases (metano):
+          </p>
+          <Formula>
+{`# Eq. 20-311 — N urinário
+Ur_N_g = (An_CPIn × 1000 − Mlk_CP_g − Fe_CPend × 1000) / 6,25
+                                                          [g N/d]
+# Eq. 20-308 — energia urinária
+Ur_DEIn = 0,0143 × Ur_N_g                                 [Mcal/d]
+
+# Eq. 3-9 / 20-310 — gases (vaca lactando, CH4)
+An_GasEOut = 0,294 × DMI
+           − 0,347 × FA_%MS
+           + 0,0409 × dNDF_%MS                            [Mcal/d]
+
+# Eq. 20-307 — ME = DE − perdas
+An_MEIn = An_DEIn − Ur_DEIn − An_GasEOut                  [Mcal/d]`}
+          </Formula>
+        </div>
+
+        {/* PARTE D — NEL e Leite Potencial */}
+        <div className="border-l-4 border-amber-300 pl-4">
+          <h3 className="font-semibold text-amber-800 mb-2">Parte D — NEL e Leite Potencial</h3>
+          <Formula>
+{`# Eq. 20-223 — conversão para Energia Líquida (lactação)
+An_NEIn = An_MEIn × 0,66                                  [Mcal NEL/d]
+
+# Eq. 3-13 — manutenção energética
+NEm = 0,10 × PV^0,75                                      [Mcal NEL/d]
+
+# Eq. 3-14a — NEL por kg de leite
+NEL_por_kg = 0,0929×G + 0,055×PB + 0,0395×Lact            [Mcal/kg]
 
 # Leite potencial pela energia
-Leite_NEL     = NEL_leite ÷ NEL_por_kg                    [kg/d]`}
+Leite_NEL = (An_NEIn − NEm) ÷ NEL_por_kg                  [kg/d]`}
           </Formula>
         </div>
 
         <div>
-          <h3 className="font-semibold text-gray-800 mb-3">Exemplo</h3>
-          <div className="bg-amber-50 rounded-xl p-3 text-xs text-amber-800 mb-3">
-            <strong>Cenário:</strong> dieta com NEL média de 1,65 Mcal/kg MS × 22,2 kg MS = 36,6 Mcal/d
+          <h3 className="font-semibold text-gray-800 mb-3">Exemplo passo a passo</h3>
+          <div className="bg-amber-50 rounded-xl p-3 text-xs text-amber-800 mb-3 space-y-1">
+            <div><strong>Vaca:</strong> 650 kg · 30 kg leite · gord 3,5% · prot 3,2% · lact 4,7%</div>
+            <div><strong>Dieta (23 kg MS):</strong> Silagem Milho + Milho moído + Farelo Soja + Caroço de Algodão</div>
+            <div><strong>Composição:</strong> NDF 28% · Amido 35% · FA 3,8% · CP 17%</div>
           </div>
           <div className="space-y-3">
-            <Passo n={1} label="Manutenção (PV^0,75 = 650^0,75 = 128,8)"
+            <Passo n={1} label="Componentes digeridos (Parte A)"
+              formula="DigNDF ≈ 1,9 · DigSt ≈ 7,2 · DigFA ≈ 0,64 · DigCP ≈ 2,7 · DigrOM ≈ 2,7"
+              resultado="kg/d" />
+            <Passo n={2} label="DE intake (Eq. 20-182)"
+              formula="1,9×4,20 + 7,2×4,23 + 0,64×9,40 + 2,7×5,65 + 2,7×4,00"
+              resultado="≈ 70,8 Mcal/d  (3,08 Mcal/kg MS)" />
+            <Passo n={3} label="N urinário (Eq. 20-311)"
+              formula="(CP×1000 − Mlk_CP_g − Fe_CPend_g) / 6,25"
+              resultado="≈ 406 g N/d  →  Ur_DEIn ≈ 5,8 Mcal/d" />
+            <Passo n={4} label="Energia dos gases / CH4 (Eq. 3-9)"
+              formula="0,294×23 − 0,347×3,81 + 0,0409×8,36"
+              resultado="≈ 5,8 Mcal/d" />
+            <Passo n={5} label="ME intake (Eq. 20-307)"
+              formula="70,8 − 5,8 − 5,8"
+              resultado="≈ 59,2 Mcal/d  (2,57 Mcal/kg MS)" />
+            <Passo n={6} label="NEL intake (Eq. 20-223)"
+              formula="59,2 × 0,66"
+              resultado="≈ 39,1 Mcal/d  (1,70 Mcal/kg MS)" />
+            <Passo n={7} label="Manutenção (650^0,75 = 128,8)"
               formula="0,10 × 128,8"
               resultado="= 12,88 Mcal/d" />
-            <Passo n={2} label="NEL disponível para leite"
-              formula="36,6 − 12,88"
-              resultado="= 23,72 Mcal/d" />
-            <Passo n={3} label="NEL por kg de leite"
+            <Passo n={8} label="NEL por kg de leite (Eq. 3-14a)"
               formula="0,0929×3,5 + 0,055×3,2 + 0,0395×4,7"
               resultado="≈ 0,687 Mcal/kg" />
-            <Passo n={4} label="Leite potencial pela energia"
-              formula="23,72 ÷ 0,687"
-              resultado="≈ 34,5 kg/d" />
+            <Passo n={9} label="Leite potencial pela energia"
+              formula="(39,1 − 12,88) ÷ 0,687"
+              resultado="≈ 38,2 kg/d" />
           </div>
           <div className="mt-3 rounded-lg bg-amber-100 px-4 py-3 text-sm text-amber-800">
-            <strong>Interpretação:</strong> a energia desta dieta suporta até ~34,5 kg/d. Se a vaca produz menos do que isso,
-            sobra energia para deposição de tecido ou para ser desperdiçada como calor. Se produz mais, vai mobilizar reserva corporal.
+            <strong>Interpretação:</strong> esta dieta suporta até ~38 kg de leite/d pela energia. A vaca produz 30 kg/d,
+            então sobra energia (~5–6 Mcal/d) que vai para deposição de tecido ou é dissipada como calor. Se ela aumentar
+            a produção, a energia ainda atende. <strong>Comparação NASEM Tabela 20-16</strong>: previsto médio 34,7 kg/d
+            vs observado 30,9 kg/d (CCC 0,67) — números compatíveis.
           </div>
+        </div>
+
+        <div className="bg-amber-50/60 border border-amber-200 rounded-xl p-3 text-xs text-amber-900">
+          <strong>Limitação v1 conhecida:</strong> NPN (Ureia) tratado como CP normal na Eq. 20-182. Como NPN tem
+          GE menor (0,89 Mcal/kg vs 5,65 Mcal/kg do CP verdadeiro), DE é superestimada em ~1% quando há Ureia.
+          Sem impacto prático.
         </div>
       </Secao>
 
@@ -482,22 +580,22 @@ An_MPavailMilk = An_MPIn − mp_mantenca − Gest_MPuse`}
       </Secao>
 
       {/* ── 5. Pendências NASEM 2021 ──────────────────────────── */}
-      <Secao titulo="5. O que ainda não está 100% NASEM 2021" subtitulo="Itens pendentes e impacto numérico" cor="gray">
+      <Secao titulo="5. O que ainda não está 100% NASEM 2021" subtitulo="Único item pendente e impacto numérico" cor="gray">
 
         <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 text-sm text-gray-700">
           <p>
-            O motor atual implementa <strong>literalmente</strong> as equações NASEM 2021 para CMS, RUP/RDP,
-            proteína microbiana (Michaelis-Menten), manutenção proteica, gestação e leite potencial pela proteína.
-            Restam <strong>2 lacunas</strong> documentadas abaixo.
+            O motor implementa <strong>literalmente</strong> as equações NASEM 2021 para CMS, RUP/RDP,
+            proteína microbiana (Michaelis-Menten), manutenção proteica, gestação, leite potencial pela proteína
+            <strong> e cadeia de energia (DE → ME → NEL)</strong>. Resta <strong>1 lacuna menor</strong> documentada abaixo.
           </p>
           <p className="mt-2 text-xs text-gray-500">
             Detalhamento completo equação-por-equação em <code className="bg-white border border-gray-200 rounded px-1">GAP_ANALYSIS_NASEM2021.md</code> na raiz do projeto.
           </p>
         </div>
 
-        {/* Pendência A — Body gain */}
+        {/* Única pendência — Body gain */}
         <div className="border-l-4 border-gray-400 pl-4">
-          <h3 className="font-semibold text-gray-800 mb-1">A — Ganho/perda corporal proteico <code className="text-xs bg-gray-100 px-1 rounded">Body_MPuse</code></h3>
+          <h3 className="font-semibold text-gray-800 mb-1">Ganho/perda corporal proteico <code className="text-xs bg-gray-100 px-1 rounded">Body_MPuse</code></h3>
           <p className="text-sm text-gray-600 mb-2">
             Vacas em ganho ativo de ECC (recuperando reservas pós-pico) consomem MP para deposição de tecido.
             Vacas perdendo ECC (BEN, início da lactação) liberam parte dessa MP. NASEM modela isso pelas
@@ -512,26 +610,6 @@ An_MPavailMilk = An_MPIn − mp_mantenca − Gest_MPuse`}
             <strong>Como contornar enquanto não está implementado:</strong> formule para vacas em ECC estável (a maioria das vacas a partir de DEL 60+).
             Em vacas no início da lactação (DEL &lt; 30) com perda visível de ECC, considere uma margem de segurança
             de +1–2 kg de leite no fator limitante.
-          </p>
-        </div>
-
-        {/* Pendência B — Energia */}
-        <div className="border-l-4 border-gray-400 pl-4">
-          <h3 className="font-semibold text-gray-800 mb-1">B — Cadeia de Energia <code className="text-xs bg-gray-100 px-1 rounded">DE → ME → NEL</code></h3>
-          <p className="text-sm text-gray-600 mb-2">
-            O NASEM 2021 <strong>não usa NDT/NEL</strong> como input do alimento. Calcula GE → DE → ME → NEL a
-            partir dos componentes digestíveis (NDF, amido, FA, CP, rOM) usando as Eq. 20-170 a 20-310.
-            O motor atual ainda usa a abordagem NRC 2001 (NEL direto do alimento) — mas como o banco NASEM
-            <strong> não traz NEL preenchido</strong>, o cálculo zera.
-          </p>
-          <div className="bg-rose-50 border border-rose-200 rounded p-2.5 text-xs text-rose-900">
-            <strong>Impacto:</strong> o card <em>"⚡ Leite Potencial pela Energia"</em> aparece zerado para todos os alimentos
-            do banco NASEM. O <em>fator limitante</em> sempre indica "energia" porque Leite_NEL = 0 &lt; Leite_PM.
-            <strong> Isso será corrigido em prompt separado</strong> — refatoração de ~2 dias.
-          </div>
-          <p className="text-xs text-gray-500 mt-2">
-            <strong>Como contornar enquanto não está implementado:</strong> use o leite potencial pela proteína como
-            referência principal. Compare com o leite real e ajuste empiricamente, sem confiar no card de energia.
           </p>
         </div>
 

@@ -117,6 +117,7 @@ export function calcularResultados(
   let kgVITA = 0, kgVITD3 = 0, kgVITE = 0;
   let kgBIOTINA = 0, kgMONENSINA = 0, kgCR = 0, kgLEVEDURA = 0;
   let kgFDN8 = 0;
+  let kgCinza = 0;        // necessário para rOM (Eq. 20-99) na cadeia de energia
   let kgMS_forragem = 0;
   let kgMN_forragem = 0;   // necessário para Dt_ForWet (Eq. 20-52/53)
   let custoTotal = 0;
@@ -198,6 +199,7 @@ export function calcularResultados(
     kgAMIDO_DEG += kPc_pct > 0 && kd_amido > 0
       ? (kd_amido / (kd_amido + kPc_pct)) * amido * kgMS
       : 0;
+    kgCinza += (a.cinza ?? 0) * kgMS;
 
     kgMET += (a.met ?? 0) * kgMS;
     kgLYS += (a.lys ?? 0) * kgMS;
@@ -232,16 +234,9 @@ export function calcularResultados(
 
   const ms = totalKgMS || 1;
 
-  // conversão para % MS (já em proporção 0-1 para macros, mg/kg para micros)
-  const nel_mcal_kg = kgNEL / ms;
-
-  // ── Leite potencial pela energia (NEl) — NRC 2021 ──────────────────────────
-  // Mantença: NEm = 0,10 × PV^0,75 Mcal/d (NRC 2021 Eq. 3-13; era 0,08 no NRC 2001)
-  // NEL/kg leite = 0,0929×gord% + 0,055×prot% + 0,0395×lact%  (NRC 2021 Eq. 3-14a)
-  const nelMantenca = 0.10 * Math.pow(animal.peso, 0.75);
-  const nelDisponivel = kgNEL - nelMantenca;
-  const nel_por_kg_leite = 0.0929 * animal.gordura + 0.055 * animal.proteina + 0.0395 * animal.lactose;
-  const leite_potencial_nel = nel_por_kg_leite > 0 ? Math.max(0, nelDisponivel / nel_por_kg_leite) : 0;
+  // NEL exibido (nel_mcal_kg) é definido APÓS a cadeia de energia abaixo,
+  // porque depende de An_NEIn calculado lá. Declaração com let para permitir
+  // referência depois.
 
   // ── Proteína Microbiana — Michaelis-Menten (NASEM 2021 Eq. 20-74/75/76) ─────
   // Parâmetros fixos (Eq. 20-75)
@@ -300,6 +295,7 @@ export function calcularResultados(
 
   // Equação de Michaelis-Menten (Eq. 20-74) com proteção contra divisão por zero
   let Du_MiCP   = 0;
+  let Du_idMiCP = 0;
   let Du_idMiTP = 0;
   if (Rum_DigNDFIn > 0 || Rum_DigStIn > 0) {
     const denom = 1
@@ -307,8 +303,8 @@ export function calcularResultados(
       + (Rum_DigStIn  > 0 ? MiN_KmrdSt  / Rum_DigStIn  : 0);
     const Du_MiN_g = MiN_Vm / denom;                  // g N/d
     Du_MiCP        = Du_MiN_g * 6.25 / 1000;          // kg/d (Eq. 20-76)
-    const Du_idMiCP = Du_MiCP * 0.80;                  // kg/d (Eq. 20-126)
-    Du_idMiTP       = Du_idMiCP * 0.824;               // kg/d (Eq. 20-127)
+    Du_idMiCP      = Du_MiCP * 0.80;                  // kg/d (Eq. 20-126)
+    Du_idMiTP      = Du_idMiCP * 0.824;               // kg/d (Eq. 20-127)
   }
 
   // MP total disponível (Eq. 20-136): MP = idRUP + idMiTP
@@ -328,6 +324,95 @@ export function calcularResultados(
   // Urinária é direta (eff = 1)
   const KmMP_NP = 0.69;
   const mp_mantenca = (Scrf_NP + Fe_NPend) / KmMP_NP + Ur_NPend;          // kg/d
+
+  // ── NASEM 2021 — Cadeia de Energia (DE → ME → NEL) ───────────────────────
+  // Implementa Eq. 20-111/113/114/115 (NDF total tract), Eq. 20-84 (Amido TT),
+  // Eq. 3-7b (CP digestion), Eq. 20-99 (rOM), Eq. 20-153 (FA dig via Tabela 4-1),
+  // Eq. 20-182 (DE), Eq. 20-308/311 (Ur_DE), Eq. 3-9/20-310 (GasE), Eq. 20-307/223 (ME/NEL).
+  let An_DEIn = 0, An_MEIn = 0, An_NEIn = 0;
+  let Dt_DigNDFIn = 0, Dt_DigStIn = 0, Dt_DigFAIn = 0, An_DigCPaIn = 0, Dt_DigrOMIn = 0;
+  if (totalKgMS > 0) {
+    // 1) Total Tract NDF (Eq. 20-111 com IVNDFD48; ajustes Eq. 20-115)
+    let Dt_DigNDFIn_Base_kg = 0;
+    for (const slot of slots) {
+      if (!slot.alimentoNome || slot.kgMN <= 0) continue;
+      const a = alimentos.find(x => x.nome === slot.alimentoNome);
+      if (!a || !a.fdn || a.fdn <= 0) continue;
+      const kgMS_slot = slot.kgMN * a.ms;
+      // Fd_dcNDF_base: Eq. 20-111 se IVNDFD48 disponível; fallback 0,50 (média NASEM forrageiras)
+      const Fd_dcNDF_base = (a.ivndfd48 !== null && a.ivndfd48 !== undefined)
+        ? (12 + 0.61 * a.ivndfd48) / 100
+        : 0.50;
+      Dt_DigNDFIn_Base_kg += Fd_dcNDF_base * a.fdn * kgMS_slot;
+    }
+    const Dt_dcNDF_Base = kgFDN > 0 ? Dt_DigNDFIn_Base_kg / kgFDN : 0;
+    const dmi_bw_frac   = totalKgMS / animal.peso;
+    const st_frac       = kgAMIDO / totalKgMS;
+    const Dt_dcNDF = Math.max(0, Math.min(1,
+      Dt_dcNDF_Base - 1.1 * (dmi_bw_frac - 0.035) - 0.59 * (st_frac - 0.26)
+    ));
+    Dt_DigNDFIn = Dt_dcNDF * kgFDN;
+
+    // 2) Total Tract Starch (TT_dcSt = 0,92 — default NASEM Cap. 4 para amidos típicos)
+    Dt_DigStIn = kgAMIDO * 0.92;
+
+    // 3) FA digestion — Tabela 4-1 NASEM (heurística por nome/classificação)
+    for (const slot of slots) {
+      if (!slot.alimentoNome || slot.kgMN <= 0) continue;
+      const a = alimentos.find(x => x.nome === slot.alimentoNome);
+      if (!a) continue;
+      const kgMS_slot = slot.kgMN * a.ms;
+      const kgFA_slot = (a.ee ?? 0) * kgMS_slot;
+      if (kgFA_slot <= 0) continue;
+      let dcFA = 0.73;  // default Tabela 4-1
+      const nm = a.nome.toLowerCase();
+      if (a.classificacao === 'Gordura/Óleo' && nm.includes('óleo de')) dcFA = 0.70;
+      else if (nm.includes('sabões de cálcio')) dcFA = 0.76;
+      Dt_DigFAIn += dcFA * kgFA_slot;
+    }
+
+    // 4) CP digestion (Eq. 3-7b)
+    An_DigCPaIn = Math.max(0, An_RDPIn + An_idRUPIn - (Du_MiCP - Du_idMiCP) - Fe_CPend);
+
+    // 5) rOM (Eq. 20-99): rOM = OM - NDF - amido - FA - CP, dcrOM = 96,1%
+    const kgOM  = Math.max(0, totalKgMS - kgCinza);
+    const kgROM = Math.max(0, kgOM - kgFDN - kgAMIDO - kgEE - kgPB);
+    Dt_DigrOMIn = kgROM * 0.961;
+
+    // 6) DE intake (Eq. 20-182) com heats of combustion da Tabela 20-9
+    An_DEIn = Dt_DigNDFIn * 4.20
+            + Dt_DigStIn  * 4.23
+            + Dt_DigFAIn  * 9.40
+            + An_DigCPaIn * 5.65
+            + Dt_DigrOMIn * 4.00;
+    // Nota v1: NPN (Ureia) tratado como CP normal — superestima DE_CP em ~1%
+    // quando há Ureia na dieta (ela tem 0,89 Mcal/kg vs 5,65 do TP). Documentado.
+
+    // 7) Urinary energy (Eq. 20-311 e 20-308)
+    const Milk_CP_g = animal.leite * animal.proteina * 10;  // kg leite × % CP × 10 → g/d
+    const Ur_N_g    = Math.max(0, (kgPB * 1000 - Milk_CP_g - Fe_CPend * 1000) / 6.25);
+    const Ur_DEIn   = 0.0143 * Ur_N_g;
+
+    // 8) Gas energy — vaca lactando (Eq. 3-9 / 20-310 caso "Lactating Cow")
+    const FA_pctMS    = (kgEE / totalKgMS) * 100;
+    const dNDF_pctMS  = (Dt_DigNDFIn / totalKgMS) * 100;
+    const An_GasEOut  = 0.294 * totalKgMS - 0.347 * FA_pctMS + 0.0409 * dNDF_pctMS;
+    // Nota: redução de 5% se monensina presente (Eq. 20-310 nota) — não aplicada v1
+
+    // 9) ME (Eq. 20-307) e NEL (Eq. 20-223)
+    An_MEIn = Math.max(0, An_DEIn - Ur_DEIn - An_GasEOut);
+    An_NEIn = An_MEIn * 0.66;  // Kl_ME_NE = 0,66 (Eq. 20-223)
+  }
+
+  // Densidade NEL exibida (Mcal/kg MS) — vem da cadeia NASEM, com fallback legacy
+  const nel_mcal_kg = An_NEIn > 0 ? An_NEIn / ms : kgNEL / ms;
+
+  // ── Leite potencial pela energia (NASEM 2021 Eq. 3-13/14a) ─────────────────
+  const nelMantenca       = 0.10 * Math.pow(animal.peso, 0.75);                // Eq. 3-13
+  const nel_por_kg_leite  = 0.0929 * animal.gordura + 0.055 * animal.proteina + 0.0395 * animal.lactose;
+  const leite_potencial_nel = nel_por_kg_leite > 0
+    ? Math.max(0, (An_NEIn - nelMantenca) / nel_por_kg_leite)
+    : 0;
 
   // ── Gestação proteica — Gest_MPuse (NASEM 2021 Eq. 20-225 a 20-239) ──────
   // Calcula MP consumida pelo crescimento do útero grávido. Subtrai de
@@ -410,6 +495,8 @@ export function calcularResultados(
     fda: kgFDA / ms,
     nel: nel_mcal_kg,
     ndt: kgNDT / ms,
+    dt_de: An_DEIn > 0 ? An_DEIn / ms : undefined,
+    dt_me: An_MEIn > 0 ? An_MEIn / ms : undefined,
     ee: kgEE / ms,
     ee_insat: kgEE_INSAT / ms,
     cnf: kgCNF / ms,

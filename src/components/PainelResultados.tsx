@@ -164,6 +164,16 @@ export default function PainelResultados({ resultado, leite, precoLeite }: Props
         </div>
       </div>
 
+      {/* Densidade energética da dieta (NASEM 2021 — cadeia DE → ME → NEL) */}
+      {(resultado.dt_de || resultado.dt_me) && (
+        <div className="text-[11px] text-gray-500 text-center tabular-nums px-2 -mt-1">
+          <span className="font-medium">Densidade energética: </span>
+          {resultado.dt_de !== undefined && <>DE {resultado.dt_de.toFixed(2)} · </>}
+          {resultado.dt_me !== undefined && <>ME {resultado.dt_me.toFixed(2)} · </>}
+          NEL {resultado.nel.toFixed(2)} <span className="text-gray-400">Mcal/kg MS</span>
+        </div>
+      )}
+
       {/* Cards de custo/receita */}
       <div className="grid grid-cols-2 gap-2">
         <div className="border border-gray-200 rounded-xl p-2 bg-gray-50">
