@@ -73,6 +73,20 @@ export interface Alimento {
   ivndfd48?: number | null;       // Digestibilidade in vitro FDN 48h, % do FDN — NASEM 2021
   fonte_nasem?: string | null;    // Nome original NASEM (rastreabilidade)
   alimento_base?: string | null;  // Nome PT-BR do alimento clonado como base (rastreabilidade)
+  origem_laudo?: LaudoMetadata | null;  // Metadata se importado de XML de laboratório
+}
+
+/** Metadata de laudo de análise (importado via XML — schema CVAS/Dairy One/3R Lab) */
+export interface LaudoMetadata {
+  laboratorio: string;       // ex: "3R Laboratório", "Dairy One"
+  numero_laudo: string;      // ex: "3200028117"
+  data_analise: string;      // ISO YYYY-MM-DD
+  data_chegada?: string;     // ISO
+  nome_amostra?: string;     // descrição da amostra
+  fazenda?: string;          // ex: "CAMPO RAÇÕES E MINERAIS"
+  tipo_codigo?: number;      // CVAS Feed Type code
+  importado_em: string;      // ISO timestamp do import
+  campos_calculados?: Record<string, string>;  // ex: { ivndfd48: 'calc cinético' }
 }
 
 export type Raca = 'Holstein' | 'Jersey' | 'Outra';

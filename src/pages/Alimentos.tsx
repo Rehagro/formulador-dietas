@@ -5,6 +5,9 @@ import type { Alimento } from '../types';
 import ModalBuscaAlimentoBase from '../components/alimentos/ModalBuscaAlimentoBase';
 import ModalEdicaoAlimento from '../components/alimentos/ModalEdicaoAlimento';
 import ModalVisualizacaoAlimento from '../components/alimentos/ModalVisualizacaoAlimento';
+import ModalEscolherAdicionar from '../components/alimentos/ModalEscolherAdicionar';
+import ModalImportarXML from '../components/alimentos/ModalImportarXML';
+import type { ParsedLabXML } from '../utils/parseLabXML';
 import { isAlimentoBase, origemAlimento, TIPO_LABEL } from '../components/alimentos/utils';
 
 // ───── Helpers ──────────────────────────────────────────────────────────────
@@ -126,9 +129,16 @@ export default function Alimentos() {
   }
 
   // Modais
+  const [mostrandoEscolher, setMostrandoEscolher] = useState(false);
   const [mostrandoBusca, setMostrandoBusca] = useState(false);
+  const [mostrandoImportarXML, setMostrandoImportarXML] = useState(false);
   const [visualizando, setVisualizando] = useState<Alimento | null>(null);
-  const [editando, setEditando] = useState<{ alimento: Alimento; modo: 'clone' | 'editar' } | null>(null);
+  const [editando, setEditando] = useState<{
+    alimento: Alimento;
+    modo: 'clone' | 'editar' | 'laudo';
+    valoresLaudo?: Partial<Alimento>;
+    metadataLaudo?: import('../types').LaudoMetadata;
+  } | null>(null);
 
   // Toast
   const [toast, setToast] = useState<string | null>(null);
@@ -150,9 +160,22 @@ export default function Alimentos() {
     t === 'F' ? 'bg-green-100 text-green-700' : 'bg-purple-100 text-purple-700';
 
   // ───── Handlers ──────────────────────────────────────────────────────────
+  function handleAbrirAdicionar()       { setMostrandoEscolher(true); }
+  function handleEscolherClonar()       { setMostrandoEscolher(false); setMostrandoBusca(true); }
+  function handleEscolherImportarXML()  { setMostrandoEscolher(false); setMostrandoImportarXML(true); }
+
   function handleBuscaSelecionou(base: Alimento) {
     setMostrandoBusca(false);
     setEditando({ alimento: base, modo: 'clone' });
+  }
+  function handleXMLConfirmou(parsed: ParsedLabXML, template: Alimento) {
+    setMostrandoImportarXML(false);
+    setEditando({
+      alimento: template,
+      modo: 'laudo',
+      valoresLaudo: parsed.alimento,
+      metadataLaudo: parsed.metadata,
+    });
   }
   function handleUsarComoBase(a: Alimento) {
     setVisualizando(null);
@@ -165,10 +188,11 @@ export default function Alimentos() {
   }
   async function handleSalvar(persistido: Alimento, baseNome: string | null) {
     if (!editando) return;
-    if (editando.modo === 'clone') {
+    if (editando.modo === 'clone' || editando.modo === 'laudo') {
       await adicionarAlimento({ ...persistido, id: undefined });
+      const origemMsg = editando.modo === 'laudo' ? ' (importado do laudo)' : '';
       showToast(baseNome
-        ? `✅ Alimento "${persistido.nome}" salvo. Frações proteicas baseadas em: ${baseNome}.`
+        ? `✅ Alimento "${persistido.nome}"${origemMsg} salvo. Frações proteicas baseadas em: ${baseNome}.`
         : `✅ Alimento "${persistido.nome}" salvo.`);
     } else {
       const nomeAntigo = editando.alimento.nome;
@@ -190,11 +214,27 @@ export default function Alimentos() {
         </div>
       )}
 
+      {mostrandoEscolher && (
+        <ModalEscolherAdicionar
+          onClonar={handleEscolherClonar}
+          onImportarXML={handleEscolherImportarXML}
+          onFechar={() => setMostrandoEscolher(false)}
+        />
+      )}
+
       {mostrandoBusca && (
         <ModalBuscaAlimentoBase
           alimentos={alimentos}
           onSelecionar={handleBuscaSelecionou}
           onCancelar={() => setMostrandoBusca(false)}
+        />
+      )}
+
+      {mostrandoImportarXML && (
+        <ModalImportarXML
+          alimentos={alimentos}
+          onConfirmar={handleXMLConfirmou}
+          onCancelar={() => setMostrandoImportarXML(false)}
         />
       )}
 
@@ -211,6 +251,8 @@ export default function Alimentos() {
           alimentoBase={editando.alimento}
           modo={editando.modo}
           alimentos={alimentos}
+          valoresLaudo={editando.valoresLaudo}
+          metadataLaudo={editando.metadataLaudo}
           onSalvar={handleSalvar}
           onFechar={() => setEditando(null)}
         />
@@ -219,7 +261,7 @@ export default function Alimentos() {
       <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
         <h1 className="text-xl font-bold text-gray-800">🥩 Banco de Alimentos</h1>
         <button
-          onClick={() => setMostrandoBusca(true)}
+          onClick={handleAbrirAdicionar}
           className="flex items-center gap-1.5 px-4 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 transition-colors"
         >
           <Plus size={15} /> Adicionar alimento

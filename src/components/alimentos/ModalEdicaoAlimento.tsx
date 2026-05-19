@@ -1,14 +1,43 @@
 import { useMemo, useState, type ReactNode } from 'react';
-import { X, Check, ChevronDown, ChevronUp, Lock, Info } from 'lucide-react';
-import type { Alimento } from '../../types';
-import { toDisplay, toStore, classificacoesDistintas, fmtLock, TIPO_LABEL } from './utils';
+import { X, Check, ChevronDown, ChevronUp, Lock, Info, FileText, Beaker } from 'lucide-react';
+import type { Alimento, LaudoMetadata } from '../../types';
+import { toDisplay, toStore, classificacoesDistintas, fmtLock, TIPO_LABEL, CAMPOS_FRACAO } from './utils';
 
 interface Props {
   alimentoBase: Alimento;
-  modo: 'clone' | 'editar';
+  modo: 'clone' | 'editar' | 'laudo';   // 'laudo' = clone com valores pré-preenchidos do XML
   alimentos: Alimento[];
+  /** Valores extraídos do XML do laudo (em fração 0-1 como no banco). */
+  valoresLaudo?: Partial<Alimento>;
+  /** Metadata para persistir junto. */
+  metadataLaudo?: LaudoMetadata;
   onSalvar: (a: Alimento, baseNome: string | null) => void | Promise<void>;
   onFechar: () => void;
+}
+
+/** Converte valoresLaudo (fração 0-1) para o formato de display (% 0-100). */
+function laudoParaDisplay(valores: Partial<Alimento>): Partial<Alimento> {
+  const d: Record<string, unknown> = { ...valores };
+  for (const key of CAMPOS_FRACAO) {
+    const v = d[key];
+    if (v !== null && v !== undefined && typeof v === 'number') {
+      d[key] = parseFloat((v * 100).toFixed(4));
+    }
+  }
+  return d as Partial<Alimento>;
+}
+
+/** Sugere nome para alimento novo: "{template} - {fazenda} - {data}". */
+function nomeSugerido(base: Alimento, meta?: LaudoMetadata): string {
+  if (!meta) return `Cópia de ${base.nome}`;
+  const partes: string[] = [base.nome.split(',')[0].trim()];
+  if (meta.fazenda) partes.push(meta.fazenda);
+  if (meta.data_analise) {
+    const m = meta.data_analise.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (m) partes.push(`${m[3]}/${m[2]}/${m[1]}`);
+    else partes.push(meta.data_analise);
+  }
+  return partes.join(' · ');
 }
 
 // ───────────────────────────────────────────────────────────────────────────
@@ -113,22 +142,33 @@ function CampoLock({
 // ───────────────────────────────────────────────────────────────────────────
 
 export default function ModalEdicaoAlimento({
-  alimentoBase, modo, alimentos, onSalvar, onFechar,
+  alimentoBase, modo, alimentos, valoresLaudo, metadataLaudo, onSalvar, onFechar,
 }: Props) {
-  const baseNome = alimentoBase.nome;
-  const isClone = modo === 'clone';
+  const baseNome  = alimentoBase.nome;
+  const isClone   = modo === 'clone' || modo === 'laudo';
+  const isLaudo   = modo === 'laudo';
+  // Set de campos sobrescritos pelo laudo — para mostrar badges 📤
+  const camposDoLaudo = useMemo(
+    () => new Set(valoresLaudo ? Object.keys(valoresLaudo) : []),
+    [valoresLaudo]
+  );
 
   // Form em formato display (frações como % 0-100)
   const [form, setForm] = useState<Alimento>(() => {
     const inicial = toDisplay(alimentoBase);
     if (isClone) {
-      return {
+      const base: Alimento = {
         ...inicial,
         id: undefined,
-        nome: `Cópia de ${alimentoBase.nome}`,
+        nome: nomeSugerido(alimentoBase, metadataLaudo),
         custo: null,
         alimento_base: alimentoBase.nome,
       };
+      // Se vier do laudo, sobrescreve campos extraídos
+      if (valoresLaudo) {
+        return { ...base, ...laudoParaDisplay(valoresLaudo) } as Alimento;
+      }
+      return base;
     }
     return inicial;
   });
@@ -162,7 +202,12 @@ export default function ModalEdicaoAlimento({
     setErroNome(null);
     setSalvando(true);
     try {
-      // Garante que frações proteicas vêm do alimento base (lock)
+      // Frações proteicas vêm SEMPRE do alimento base (lock).
+      // Para IVNDFD48: se laudo trouxe (calculado da cinética), prevalece o laudo;
+      // senão, herda do template NASEM.
+      const ivndfd48Final = isLaudo && valoresLaudo?.ivndfd48 != null
+        ? valoresLaudo.ivndfd48
+        : (alimentoBase.ivndfd48 ?? null);
       const persistido: Alimento = toStore({
         ...form,
         prot_a: alimentoBase.prot_a,
@@ -170,9 +215,10 @@ export default function ModalEdicaoAlimento({
         prot_c: alimentoBase.prot_c,
         kd_prot: alimentoBase.kd_prot,
         rup_digest: alimentoBase.rup_digest,
-        ivndfd48: alimentoBase.ivndfd48 ?? null,
+        ivndfd48: ivndfd48Final,
         fonte_nasem: alimentoBase.fonte_nasem ?? null,
         alimento_base: isClone ? alimentoBase.nome : (form.alimento_base ?? null),
+        origem_laudo: isLaudo ? metadataLaudo ?? null : (form.origem_laudo ?? null),
       });
       await onSalvar(persistido, isClone ? alimentoBase.nome : (form.alimento_base ?? null));
     } finally {
@@ -186,12 +232,38 @@ export default function ModalEdicaoAlimento({
         {/* Header */}
         <div className="flex items-center justify-between p-5 border-b border-gray-100">
           <h2 className="font-bold text-gray-800 text-lg">
-            {isClone ? 'Novo alimento (cópia)' : 'Editar alimento'}
+            {isLaudo ? 'Novo alimento (do laudo)' : isClone ? 'Novo alimento (cópia)' : 'Editar alimento'}
           </h2>
           <button onClick={onFechar} className="p-1.5 hover:bg-gray-100 rounded-lg">
             <X size={18} />
           </button>
         </div>
+
+        {/* Banner de origem do laudo */}
+        {isLaudo && metadataLaudo && (
+          <div className="px-5 py-3 bg-sky-50 border-b border-sky-100">
+            <div className="flex items-start gap-2 text-xs text-gray-700">
+              <FileText size={14} className="text-sky-600 flex-shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <div className="font-semibold text-sky-800 mb-0.5">
+                  📤 {camposDoLaudo.size} campo{camposDoLaudo.size !== 1 ? 's' : ''} preenchido{camposDoLaudo.size !== 1 ? 's' : ''} pelo laudo
+                </div>
+                <div className="text-gray-600 flex flex-wrap gap-x-3">
+                  <span><Beaker size={11} className="inline mr-0.5" />{metadataLaudo.laboratorio}</span>
+                  <span>Amostra {metadataLaudo.numero_laudo}</span>
+                  {metadataLaudo.data_analise && <span>{metadataLaudo.data_analise.split('-').reverse().join('/')}</span>}
+                  {metadataLaudo.fazenda && <span>{metadataLaudo.fazenda}</span>}
+                </div>
+                <div className="text-[11px] text-gray-500 mt-1">
+                  Campos do laudo: {[...camposDoLaudo].sort().join(', ')}
+                </div>
+                <div className="text-[11px] text-gray-500 mt-0.5">
+                  Demais campos (frações proteicas, etc.) herdados do template <strong>{alimentoBase.nome}</strong>.
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Body — 9 grupos */}
         <div className="p-5 space-y-3 max-h-[70vh] overflow-y-auto">

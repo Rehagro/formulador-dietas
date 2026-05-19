@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react';
-import { X, ChevronDown, ChevronUp, Lock, Copy } from 'lucide-react';
+import { X, ChevronDown, ChevronUp, Lock, Copy, FileText, Beaker } from 'lucide-react';
 import type { Alimento } from '../../types';
 import { fmtLock, origemAlimento, TIPO_LABEL } from './utils';
 
@@ -61,11 +61,40 @@ export default function ModalVisualizacaoAlimento({ alimento, onUsarComoBase, on
           <div className="min-w-0 flex items-center gap-2">
             <h2 className="font-bold text-gray-800 text-lg truncate">{alimento.nome}</h2>
             {badge}
+            {alimento.origem_laudo && (
+              <span className="bg-sky-100 text-sky-700 text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
+                <FileText size={10} /> Laudo
+              </span>
+            )}
           </div>
           <button onClick={onFechar} className="p-1.5 hover:bg-gray-100 rounded-lg">
             <X size={18} />
           </button>
         </div>
+
+        {/* Banner de origem do laudo */}
+        {alimento.origem_laudo && (
+          <div className="px-5 py-3 bg-sky-50 border-b border-sky-100 text-xs">
+            <div className="font-semibold text-sky-800 mb-1 flex items-center gap-1.5">
+              <FileText size={13} /> Origem: análise laboratorial
+            </div>
+            <div className="text-gray-700 grid grid-cols-2 gap-x-4 gap-y-0.5">
+              <div><Beaker size={11} className="inline mr-1 text-sky-600" />Laboratório: <strong>{alimento.origem_laudo.laboratorio}</strong></div>
+              <div>Amostra: <strong>{alimento.origem_laudo.numero_laudo}</strong></div>
+              {alimento.origem_laudo.data_analise && (
+                <div>Data análise: <strong>{alimento.origem_laudo.data_analise.split('-').reverse().join('/')}</strong></div>
+              )}
+              {alimento.origem_laudo.fazenda && (
+                <div>Fazenda: <strong>{alimento.origem_laudo.fazenda}</strong></div>
+              )}
+            </div>
+            {alimento.origem_laudo.campos_calculados && Object.keys(alimento.origem_laudo.campos_calculados).length > 0 && (
+              <div className="text-[11px] text-gray-500 mt-1.5">
+                Campos calculados: {Object.entries(alimento.origem_laudo.campos_calculados).map(([k, v]) => `${k} (${v})`).join('; ')}
+              </div>
+            )}
+          </div>
+        )}
 
         <div className="p-5 space-y-3 max-h-[70vh] overflow-y-auto">
 
