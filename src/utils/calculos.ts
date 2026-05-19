@@ -38,13 +38,23 @@ export function calcularCNFAlimento(a: Alimento): number {
 }
 
 export function calcularEFDNAlimento(a: Alimento, kgMS: number): number {
-  // NASEM 2021 não usa mn8/mn19 (Penn State Particle Separator).
-  // Quando efdn está informado, usa direto. Senão: forragens contribuem 100% do FDN;
-  // concentrados contribuem 33% (default conservador).
+  // Quando efdn está informado, usa direto. Quando mn8 informado, usa fórmula NRC 2001
+  // (mn8 × FDN). Caso contrário: forragens 100% FDN; concentrados 33% (default).
   if (a.efdn !== null) return a.efdn * kgMS;
   const fdn = a.fdn ?? 0;
   if (a.tipo === 'F') return fdn * kgMS;
+  if (a.mn8 !== null && a.mn8 !== undefined) {
+    return ((fdn * a.mn8) + (fdn * (1 - a.mn8) * 0.33)) * kgMS;
+  }
   return fdn * 0.33 * kgMS;
+}
+
+/** % de FDN > 8mm (PSPS) para indicador fdn8_amido_deg. Só funciona se mn8 preenchido. */
+export function calcularFDN8(a: Alimento, kgMS: number): number {
+  const fdn = a.fdn ?? 0;
+  const mn8 = a.mn8 ?? null;
+  if (a.tipo === 'F' && mn8 !== null) return fdn * mn8 * kgMS;
+  return 0;
 }
 
 interface TaxasPassagem {
@@ -105,6 +115,7 @@ export function calcularResultados(
   let kgVITA = 0, kgVITD3 = 0, kgVITE = 0;
   let kgBIOTINA = 0, kgMONENSINA = 0, kgCR = 0, kgLEVEDURA = 0;
   let kgCinza = 0;        // necessário para rOM (Eq. 20-99) na cadeia de energia
+  let kgFDN8 = 0;          // PSPS (Penn State) — só conta se mn8 preenchido no alimento
   let kgMS_forragem = 0;
   let kgMN_forragem = 0;   // necessário para Dt_ForWet (Eq. 20-52/53)
   let custoTotal = 0;
@@ -211,6 +222,8 @@ export function calcularResultados(
     kgMONENSINA += (a.monensina ?? 0) * kgMS;
     kgCR += (a.cr ?? 0) * kgMS;
     kgLEVEDURA += (a.levedura ?? 0) * kgMS;
+    kgFDN8 += calcularFDN8(a, kgMS);
+
     if (a.tipo === 'F') {
       kgMS_forragem += kgMS;
       kgMN_forragem += kgMN;
@@ -512,7 +525,7 @@ export function calcularResultados(
     levedura: kgLEVEDURA / ms,
     fdnf_kg_pv: animal.peso > 0 ? kgFDNF / animal.peso : 0,
     pct_forragem_ms: ms > 0 ? kgMS_forragem / ms : 0,
-    fdn8_amido_deg: 0,  // NASEM 2021 não usa Penn State (mn8); indicador desativado
+    fdn8_amido_deg: kgAMIDO_DEG > 0 && kgFDN8 > 0 ? kgFDN8 / kgAMIDO_DEG : 0,
     lis_met: kgMET > 0 ? kgLYS / kgMET : 0,
     ca_p: kgP > 0 ? kgCA / kgP : 0,
     dcad,

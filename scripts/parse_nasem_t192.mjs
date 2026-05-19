@@ -1,6 +1,7 @@
-// Parser da Tabela 19-2 (AAs e FAs) do NASEM 2021.
-// Estrutura: 6 alimentos por bloco. "Feed Name" + nomes (podem se estender em linha anterior).
-// Extrai apenas Met e Lys (campos pedagogicamente úteis); restante dos AAs ignorado por escopo.
+// Parser refinado da Tabela 19-2 NASEM 2021 (AAs)
+// Estrutura: 6 alimentos por bloco. Linha "Feed Name" + nomes (podem se estender em linha acima).
+// Estratégia: usar a linha "CP, % DM" (sempre tem 6 valores alinhados) para descobrir
+// posições das 6 colunas; depois extrair valor de Lys e Met de cada coluna.
 
 import fs from 'node:fs';
 
@@ -19,65 +20,77 @@ function numerosComPos(linha) {
   return result;
 }
 
-const AAS = [
-  { key: 'lys', regex: /^Lys,\s*%\s*CP/i },
-  { key: 'met', regex: /^Met,\s*%\s*CP/i },
-];
-
-function detectarAA(linha) {
-  for (const { key, regex } of AAS) if (regex.test(linha)) return key;
-  return null;
-}
-
-// Normaliza nome para comparação fuzzy
+// Normaliza nome para match (case-insensitive, remove pontuação especial)
 function normNome(s) {
   return s.toLowerCase()
-    .replace(/[\/,]/g, ' ')
-    .replace(/\bor\b/g, '')
+    .replace(/[–—�]/g, '-')
+    .replace(/[\/]/g, ' ')
+    .replace(/[,]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
 }
 
-// === Loop principal ===
-const out = {};  // nomeNormalizado → { lys, met, cp }
+// === Detecta blocos ===
+const out = {};  // nome normalizado → { lys, met }
 
 let i = 0;
 while (i < linhas.length) {
   const L = linhas[i];
   if (/^Feed Name\b/.test(L.trim())) {
-    // Coletar nomes da linha "Feed Name" + linha anterior (continuação)
-    const linhaPrev = i > 0 ? linhas[i - 2] : '';  // 2 linhas atrás (gap de linha vazia)
-
-    // Os nomes estão alinhados em colunas. Preciso encontrar posições.
-    // Estratégia: split por 2+ espaços
-    const partesPrev = linhaPrev.split(/\s{2,}/).filter(s => s.trim() !== '');
-    const partesAtu  = L.replace(/^Feed Name\s*/, '').split(/\s{2,}/).filter(s => s.trim() !== '');
-
-    // Mesclar nomes: se uma palavra está na linha anterior, ela é prefixo da do mesmo índice
-    // Heurística: se partesPrev tem mais ou igual número de itens, eles complementam
-    const nomes = [];
-    const max = Math.max(partesPrev.length, partesAtu.length);
-    for (let k = 0; k < max; k++) {
-      const p1 = partesPrev[k] || '';
-      const p2 = partesAtu[k] || '';
-      nomes.push((p1 + ' ' + p2).trim());
-    }
-
-    // As linhas seguintes contêm os nutrientes. Preciso de uma referência de posições
-    // de coluna: vou usar as posições onde aparece o primeiro número da linha "CP, % DM"
+    // Linha Feed Name + nomes
+    // Procura próxima linha "CP, % DM" para detectar posições das 6 colunas
     let k = i + 1;
-    while (k < linhas.length && !/^CP,\s*%\s*DM/i.test(linhas[k].trim())) k++;
-    if (k >= linhas.length) { i++; continue; }
+    while (k < linhas.length && k < i + 10 && !/^CP,\s*%\s*DM/i.test(linhas[k].trim())) k++;
+    if (k >= linhas.length || k >= i + 10) { i++; continue; }
     const numsCP = numerosComPos(linhas[k]);
     if (numsCP.length < 6) { i = k + 1; continue; }
-    // Posições das 6 colunas = posições dos 6 primeiros números do CP
     const posCols = numsCP.slice(0, 6).map(n => n.pos);
 
-    // Inicializa registros
-    const idsBloco = nomes.slice(0, 6).map(n => normNome(n));
-    for (const id of idsBloco) {
-      if (!out[id]) out[id] = {};
+    // Captura nomes:
+    // - Linha "Feed Name" tem os nomes (suffix) em colunas
+    // - Linha 2 acima (i-2, considerando linha vazia em i-1) pode ter prefixo dos nomes
+    function extrairCelulas(linhaTexto) {
+      const cells = [];
+      const re = /\S+(?: \S+)*/g;
+      let m;
+      while ((m = re.exec(linhaTexto)) !== null) {
+        const t = m[0].trim();
+        if (t === 'Feed' || t === 'Name' || t === 'Feed Name') continue;
+        // Filtra puramente numéricas
+        if (/^[\d., ]+$/.test(t)) continue;
+        cells.push({ pos: m.index, text: t });
+      }
+      return cells;
     }
+
+    const nomesPorCol = ['', '', '', '', '', ''];
+    // Linha "Feed Name" (suffix dos nomes)
+    const cellsFeedName = extrairCelulas(L.replace(/^Feed Name\s*/, ''));
+    // Ajusta offset (porque removemos "Feed Name " no início)
+    const ofsFeedName = L.length - L.replace(/^Feed Name\s*/, '').length;
+    cellsFeedName.forEach(c => c.pos += ofsFeedName);
+    // Linha 2 acima (continuação de nome)
+    const linhaAcima = (i - 2 >= 0) ? linhas[i - 2] : '';
+    const cellsAcima = /Feed Name|TABLE/.test(linhaAcima) ? [] : extrairCelulas(linhaAcima);
+
+    function associaCelula(cells, nomesArr) {
+      for (const cell of cells) {
+        let melhorCol = -1;
+        let melhorDist = Infinity;
+        for (let c = 0; c < 6; c++) {
+          const dist = Math.abs(cell.pos - posCols[c]);
+          if (dist < melhorDist) { melhorDist = dist; melhorCol = c; }
+        }
+        if (melhorCol !== -1 && melhorDist < 25) {
+          nomesArr[melhorCol] = (nomesArr[melhorCol] + ' ' + cell.text).trim();
+        }
+      }
+    }
+    associaCelula(cellsAcima, nomesPorCol);
+    associaCelula(cellsFeedName, nomesPorCol);
+
+    // Inicializa registros
+    const idsBloco = nomesPorCol.map(n => normNome(n));
 
     // Lê linhas até próximo "Feed Name" ou EOF
     let m = k;
@@ -85,16 +98,23 @@ while (i < linhas.length) {
       const Lm = linhas[m];
       if (/^Feed Name\b/.test(Lm.trim()) && m !== i) break;
       if (/^TABLE 19-3/.test(Lm.trim())) break;
-      const key = detectarAA(Lm.trim());
-      if (key) {
+      // Detecta linha de AA (Lys ou Met)
+      let aaKey = null;
+      if (/^Lys,\s*%\s*CP/i.test(Lm.trim())) aaKey = 'lys';
+      else if (/^Met,\s*%\s*CP/i.test(Lm.trim())) aaKey = 'met';
+      if (aaKey) {
         const nums = numerosComPos(Lm);
-        // Para cada coluna, pega o primeiro número cuja pos está no range
         for (let c = 0; c < 6; c++) {
-          const start = c === 0 ? 0 : (posCols[c-1] + posCols[c]) / 2;
-          const end   = c + 1 < 6 ? (posCols[c] + posCols[c+1]) / 2 : Infinity;
-          const cand = nums.filter(n => n.pos >= start && n.pos < end);
-          if (cand.length > 0 && idsBloco[c]) {
-            out[idsBloco[c]][key] = cand[0].value;
+          // Para cada coluna, pega o número cuja pos está mais próxima da pos da coluna
+          let melhorN = null;
+          let melhorDist = Infinity;
+          for (const n of nums) {
+            const dist = Math.abs(n.pos - posCols[c]);
+            if (dist < melhorDist) { melhorDist = dist; melhorN = n; }
+          }
+          if (melhorN && melhorDist < 15 && idsBloco[c]) {
+            if (!out[idsBloco[c]]) out[idsBloco[c]] = {};
+            out[idsBloco[c]][aaKey] = melhorN.value;
           }
         }
       }
@@ -106,13 +126,12 @@ while (i < linhas.length) {
   i++;
 }
 
-console.log('Alimentos na T19-2 (com Met/Lys):', Object.keys(out).length);
+console.log('Alimentos T19-2:', Object.keys(out).length);
 
-// Sanity check
-['alfalfa meal', 'wheat grain ground'].forEach(n => {
-  // Procura match parcial
+// Validação: Alfalfa Meal e Wheat Grain, Ground
+['alfalfa meal', 'wheat grain ground', 'soybean meal solvent extracted 48% cp'].forEach(n => {
   const found = Object.entries(out).find(([k]) => k.includes(n.replace(/\s+/g, ' ')));
-  console.log('\n', n, '→', found ? found[0] : 'não encontrado', found ? found[1] : '');
+  console.log(' ', n, '→', found ? found[0] : '(não encontrado)', found ? JSON.stringify(found[1]) : '');
 });
 
 fs.writeFileSync('C:/Users/rasaf/nasem_t192_aa.json', JSON.stringify(out, null, 2), 'utf8');

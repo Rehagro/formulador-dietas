@@ -30,6 +30,10 @@ export interface Alimento {
   wsc?: number | null;              // % MS — carboidratos solúveis em água
   de_base?: number | null;          // Mcal/kg MS — DE base NASEM Tabela 19-1
   mo?: number | null;               // mg/kg MS — Molibdênio
+  // PSPS (Penn State Particle Separator) — não usado no motor NASEM 2021, mas mantido
+  // por valor pedagógico (alunos veem em outras referências). Null por padrão.
+  mn8?: number | null;              // Fração FDN > 8mm (mn8/mn19 do PSPS)
+  mn19?: number | null;             // Fração FDN > 19mm
   ca: number | null;
   p: number | null;
   mg: number | null;

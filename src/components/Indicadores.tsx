@@ -10,12 +10,18 @@ function IndicStatus({ chave, resultado }: { chave: string; resultado: Resultado
   const ref = REFERENCIAS_LACTACAO[chave];
   if (!ref) return null;
   const valor = resultado[chave as keyof ResultadoDieta] as number;
-  const status = getStatus(valor, ref);
+  // Quando o valor é 0 (ou não finito) E a chave depende de campos opcionais que
+  // podem não estar preenchidos, exibimos "—" em vez de "0.00".
+  const indisponivel =
+    !isFinite(valor) ||
+    (valor === 0 && ['fdn8_amido_deg', 'lis_met'].includes(chave));
+  const status = indisponivel ? 'sem_ref' : getStatus(valor, ref);
   const color = statusColor(status);
-  const dot = statusDot(status);
+  const dot = indisponivel ? '⚪' : statusDot(status);
 
   let valorStr = '';
-  if (chave === 'fdnf_kg_pv') valorStr = (valor * 100).toFixed(2) + '%';
+  if (indisponivel) valorStr = '—';
+  else if (chave === 'fdnf_kg_pv') valorStr = (valor * 100).toFixed(2) + '%';
   else if (chave === 'pct_forragem_ms') valorStr = (valor * 100).toFixed(1) + '%';
   else if (chave === 'dcad') valorStr = valor.toFixed(0);
   else valorStr = valor.toFixed(2);
