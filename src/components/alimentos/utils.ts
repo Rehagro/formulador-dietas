@@ -3,10 +3,12 @@ import type { Alimento } from '../../types';
 /** Campos numéricos guardados como fração (0-1) no JSON mas exibidos como % (0-100) no form. */
 export const CAMPOS_FRACAO = new Set<keyof Alimento>([
   'ms', 'pb', 'pdr', 'pndr', 'fdn', 'efdn', 'fdnf', 'fda', 'ndt',
-  'ee', 'ee_insat', 'cinza', 'cnf', 'amido', 'mn8', 'mn19',
+  'ee', 'ee_insat', 'cinza', 'cnf', 'amido',
   'ca', 'p', 'mg', 'k', 's', 'na', 'cl',
   'met', 'lys',
   'rup_digest',
+  // Campos NASEM novos (também armazenados como fração 0-1)
+  'soluble_protein', 'adip', 'ndip', 'lignin', 'wsc',
 ]);
 
 /** Converte de formato de armazenamento (frações 0-1) para exibição (% 0-100). */

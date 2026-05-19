@@ -10,8 +10,6 @@ export interface Alimento {
   pndr: number | null;
   fdn: number | null;
   efdn: number | null;
-  mn8: number | null;
-  mn19: number | null;
   fdnf: number | null;
   fda: number | null;
   nel: number | null;
@@ -24,6 +22,14 @@ export interface Alimento {
   kd_amido: number | null;
   met: number | null;
   lys: number | null;
+  // Campos NASEM 2021 Tabela 19-1 (opcionais — pedagógicos)
+  soluble_protein?: number | null;  // % CP (fração 0-1)
+  adip?: number | null;             // % MS — proteína insolúvel em ADF
+  ndip?: number | null;             // % MS — proteína insolúvel em NDF
+  lignin?: number | null;           // % MS
+  wsc?: number | null;              // % MS — carboidratos solúveis em água
+  de_base?: number | null;          // Mcal/kg MS — DE base NASEM Tabela 19-1
+  mo?: number | null;               // mg/kg MS — Molibdênio
   ca: number | null;
   p: number | null;
   mg: number | null;

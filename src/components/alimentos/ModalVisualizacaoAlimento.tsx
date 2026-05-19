@@ -84,10 +84,12 @@ export default function ModalVisualizacaoAlimento({ alimento, onUsarComoBase, on
               <CampoRO label="PB"       sufixo="% MS"     valor={pct(alimento.pb)} />
               <CampoRO label="NDT"      sufixo="% MS"     valor={pct(alimento.ndt)} />
               <CampoRO label="NEL"      sufixo="Mcal/kg"  valor={alimento.nel} />
+              <CampoRO label="DE base"  sufixo="Mcal/kg"  valor={alimento.de_base} />
               <CampoRO label="EE"       sufixo="% MS"     valor={pct(alimento.ee)} />
               <CampoRO label="Cinza"    sufixo="% MS"     valor={pct(alimento.cinza)} />
               <CampoRO label="Amido"    sufixo="% MS"     valor={pct(alimento.amido)} />
               <CampoRO label="kd Amido" sufixo="%/h"      valor={alimento.kd_amido} />
+              <CampoRO label="WSC"      sufixo="% MS"     valor={pct(alimento.wsc)} />
             </div>
           </Grupo>
 
@@ -97,8 +99,7 @@ export default function ModalVisualizacaoAlimento({ alimento, onUsarComoBase, on
               <CampoRO label="eFDN"     sufixo="% MS" valor={pct(alimento.efdn)} />
               <CampoRO label="FDNF"     sufixo="% MS" valor={pct(alimento.fdnf)} />
               <CampoRO label="FDA"      sufixo="% MS" valor={pct(alimento.fda)} />
-              <CampoRO label="mn8"      sufixo="%FDN" valor={pct(alimento.mn8)} />
-              <CampoRO label="mn19"     sufixo="%FDN" valor={pct(alimento.mn19)} />
+              <CampoRO label="Lignina"  sufixo="% MS" valor={pct(alimento.lignin)} />
               <CampoRO label="EE Insat" sufixo="% MS" valor={pct(alimento.ee_insat)} />
             </div>
           </Grupo>
@@ -111,6 +112,9 @@ export default function ModalVisualizacaoAlimento({ alimento, onUsarComoBase, on
               <CampoRO label="Kd (Fração B)"    sufixo="%/h"  valor={fmtLock(alimento.kd_prot)}     lock />
               <CampoRO label="Digest. RUP"      sufixo="%"    valor={alimento.rup_digest !== null && alimento.rup_digest !== undefined ? (alimento.rup_digest * 100).toFixed(2) : '—'} lock />
               <CampoRO label="IVNDFD48"         sufixo="%FDN" valor={fmtLock(alimento.ivndfd48)}    lock />
+              <CampoRO label="Prot. Solúvel"    sufixo="%PB"  valor={alimento.soluble_protein !== null && alimento.soluble_protein !== undefined ? (alimento.soluble_protein * 100).toFixed(2) : '—'} lock />
+              <CampoRO label="ADIP"             sufixo="% MS" valor={pct(alimento.adip)} lock />
+              <CampoRO label="NDIP"             sufixo="% MS" valor={pct(alimento.ndip)} lock />
             </div>
           </Grupo>
 
@@ -135,13 +139,14 @@ export default function ModalVisualizacaoAlimento({ alimento, onUsarComoBase, on
 
           <Grupo titulo="7. Microminerais">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              <CampoRO label="Cobalto"  sufixo="mg/kg" valor={alimento.co} />
-              <CampoRO label="Cobre"    sufixo="mg/kg" valor={alimento.cu} />
-              <CampoRO label="Manganês" sufixo="mg/kg" valor={alimento.mn_min} />
-              <CampoRO label="Zinco"    sufixo="mg/kg" valor={alimento.zn} />
-              <CampoRO label="Selênio"  sufixo="mg/kg" valor={alimento.se} />
-              <CampoRO label="Iodo"     sufixo="mg/kg" valor={alimento.i} />
-              <CampoRO label="Ferro"    sufixo="mg/kg" valor={alimento.fe} />
+              <CampoRO label="Cobalto"   sufixo="mg/kg" valor={alimento.co} />
+              <CampoRO label="Cobre"     sufixo="mg/kg" valor={alimento.cu} />
+              <CampoRO label="Manganês"  sufixo="mg/kg" valor={alimento.mn_min} />
+              <CampoRO label="Zinco"     sufixo="mg/kg" valor={alimento.zn} />
+              <CampoRO label="Selênio"   sufixo="mg/kg" valor={alimento.se} />
+              <CampoRO label="Iodo"      sufixo="mg/kg" valor={alimento.i} />
+              <CampoRO label="Ferro"     sufixo="mg/kg" valor={alimento.fe} />
+              <CampoRO label="Molibdênio" sufixo="mg/kg" valor={alimento.mo} />
             </div>
           </Grupo>
 

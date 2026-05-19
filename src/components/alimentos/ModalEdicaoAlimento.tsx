@@ -52,7 +52,7 @@ function CampoEdit({
   label, valor, onChange, sufixo,
 }: {
   label: string;
-  valor: number | string | null;
+  valor: number | string | null | undefined;
   onChange: (v: number | string | null) => void;
   sufixo?: string;
 }) {
@@ -251,10 +251,12 @@ export default function ModalEdicaoAlimento({
               <CampoEdit label="PB"        sufixo="% MS"     valor={form.pb}       onChange={set('pb')} />
               <CampoEdit label="NDT"       sufixo="% MS"     valor={form.ndt}      onChange={set('ndt')} />
               <CampoEdit label="NEL"       sufixo="Mcal/kg"  valor={form.nel}      onChange={set('nel')} />
+              <CampoEdit label="DE base"   sufixo="Mcal/kg"  valor={form.de_base}  onChange={set('de_base')} />
               <CampoEdit label="EE"        sufixo="% MS"     valor={form.ee}       onChange={set('ee')} />
               <CampoEdit label="Cinza"     sufixo="% MS"     valor={form.cinza}    onChange={set('cinza')} />
               <CampoEdit label="Amido"     sufixo="% MS"     valor={form.amido}    onChange={set('amido')} />
               <CampoEdit label="kd Amido"  sufixo="%/h"      valor={form.kd_amido} onChange={set('kd_amido')} />
+              <CampoEdit label="WSC"       sufixo="% MS"     valor={form.wsc}      onChange={set('wsc')} />
             </div>
           </Grupo>
 
@@ -265,8 +267,7 @@ export default function ModalEdicaoAlimento({
               <CampoEdit label="eFDN"      sufixo="% MS" valor={form.efdn}     onChange={set('efdn')} />
               <CampoEdit label="FDNF"      sufixo="% MS" valor={form.fdnf}     onChange={set('fdnf')} />
               <CampoEdit label="FDA"       sufixo="% MS" valor={form.fda}      onChange={set('fda')} />
-              <CampoEdit label="mn8"       sufixo="%FDN" valor={form.mn8}      onChange={set('mn8')} />
-              <CampoEdit label="mn19"      sufixo="%FDN" valor={form.mn19}     onChange={set('mn19')} />
+              <CampoEdit label="Lignina"   sufixo="% MS" valor={form.lignin}   onChange={set('lignin')} />
               <CampoEdit label="EE Insat"  sufixo="% MS" valor={form.ee_insat} onChange={set('ee_insat')} />
             </div>
           </Grupo>
@@ -287,6 +288,9 @@ export default function ModalEdicaoAlimento({
               <CampoLock label="Kd (Fração B)"       sufixo="%/h"  valor={alimentoBase.kd_prot} />
               <CampoLock label="Digest. intestinal RUP" sufixo="%" valor={alimentoBase.rup_digest !== null && alimentoBase.rup_digest !== undefined ? alimentoBase.rup_digest * 100 : null} />
               <CampoLock label="IVNDFD48"            sufixo="%FDN" valor={alimentoBase.ivndfd48} />
+              <CampoLock label="Prot. Solúvel"       sufixo="%PB"  valor={alimentoBase.soluble_protein !== null && alimentoBase.soluble_protein !== undefined ? alimentoBase.soluble_protein * 100 : null} />
+              <CampoLock label="ADIP"                sufixo="% MS" valor={alimentoBase.adip !== null && alimentoBase.adip !== undefined ? alimentoBase.adip * 100 : null} />
+              <CampoLock label="NDIP"                sufixo="% MS" valor={alimentoBase.ndip !== null && alimentoBase.ndip !== undefined ? alimentoBase.ndip * 100 : null} />
             </div>
           </Grupo>
 
@@ -321,6 +325,7 @@ export default function ModalEdicaoAlimento({
               <CampoEdit label="Selênio"   sufixo="mg/kg" valor={form.se}      onChange={set('se')} />
               <CampoEdit label="Iodo"      sufixo="mg/kg" valor={form.i}       onChange={set('i')} />
               <CampoEdit label="Ferro"     sufixo="mg/kg" valor={form.fe}      onChange={set('fe')} />
+              <CampoEdit label="Molibdênio" sufixo="mg/kg" valor={form.mo}     onChange={set('mo')} />
             </div>
           </Grupo>
 
