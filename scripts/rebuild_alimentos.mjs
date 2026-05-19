@@ -125,7 +125,7 @@ const novo = atual.map(a => {
     reescrito[k] = null;
   }
 
-  // Substitui pelos valores NASEM convertidos
+  // Substitui pelos valores NASEM convertidos (PDF)
   for (const [nasemKey, jsonKey, tipo] of MAPEAMENTO) {
     if (nasemRec[nasemKey] !== undefined && nasemRec[nasemKey] !== null) {
       reescrito[jsonKey] = converte(nasemRec[nasemKey], tipo);
@@ -134,10 +134,9 @@ const novo = atual.map(a => {
 
   // ── Met/Lys da Tabela 19-2 NASEM (match por nome normalizado) ────────────
   // T19-2 dá Met/Lys em % CP. Converte para % MS via PB.
-  const chaveAA = chave;  // mesma normalização
+  const chaveAA = chave;
   let aaRec = aa[chaveAA];
   if (!aaRec) {
-    // Match parcial
     for (const [k, v] of Object.entries(aa)) {
       if (k.includes(chaveAA) || chaveAA.includes(k)) { aaRec = v; break; }
     }
@@ -147,10 +146,57 @@ const novo = atual.map(a => {
     if (aaRec.lys !== undefined) reescrito.lys = parseFloat((reescrito.pb * aaRec.lys / 100).toFixed(6));
   }
 
-  // ── Campos DERIVADOS para uso pedagógico ─────────────────────────────────
+  // ── Enriquecimento CSV NASEM — SOBRESCREVE valores do PDF ──────────────────
+  // O CSV oficial do nasem_dairy é fonte computável (mais confiável que parser
+  // do PDF). Quando ambos têm valor, CSV vence. Resolve bugs como Silagem de
+  // Milho Maduro amido=5% (CSV: 35.5%) e similares.
+  const extraRec = nasemRec.nrc_id ? extra[nasemRec.nrc_id] : null;
+  if (extraRec) {
+    // Composição básica (% MS → fração 0-1)
+    if (extraRec.dm     !== undefined) reescrito.ms     = parseFloat((extraRec.dm / 100).toFixed(6));
+    if (extraRec.cp     !== undefined) reescrito.pb     = parseFloat((extraRec.cp / 100).toFixed(6));
+    if (extraRec.ndf    !== undefined) reescrito.fdn    = parseFloat((extraRec.ndf / 100).toFixed(6));
+    if (extraRec.adf    !== undefined) reescrito.fda    = parseFloat((extraRec.adf / 100).toFixed(6));
+    if (extraRec.starch !== undefined) reescrito.amido  = parseFloat((extraRec.starch / 100).toFixed(6));
+    if (extraRec.ee     !== undefined) reescrito.ee     = parseFloat((extraRec.ee / 100).toFixed(6));
+    if (extraRec.ash    !== undefined) reescrito.cinza  = parseFloat((extraRec.ash / 100).toFixed(6));
+    if (extraRec.lignin !== undefined) reescrito.lignin = parseFloat((extraRec.lignin / 100).toFixed(6));
+    if (extraRec.wsc    !== undefined) reescrito.wsc    = parseFloat((extraRec.wsc / 100).toFixed(6));
+    // Frações proteicas (% CP — mantém escala)
+    if (extraRec.cpa     !== undefined) reescrito.prot_a    = extraRec.cpa;
+    if (extraRec.cpb     !== undefined) reescrito.prot_b    = extraRec.cpb;
+    if (extraRec.cpc     !== undefined) reescrito.prot_c    = extraRec.cpc;
+    if (extraRec.kd_prot !== undefined) reescrito.kd_prot   = extraRec.kd_prot;
+    if (extraRec.drup    !== undefined) reescrito.rup_digest= parseFloat((extraRec.drup / 100).toFixed(4));
+    if (extraRec.sp      !== undefined) reescrito.soluble_protein = parseFloat((extraRec.sp / 100).toFixed(4));
+    if (extraRec.ndip    !== undefined) reescrito.ndip      = parseFloat((extraRec.ndip / 100).toFixed(6));
+    if (extraRec.adip    !== undefined) reescrito.adip      = parseFloat((extraRec.adip / 100).toFixed(6));
+    if (extraRec.ivndfd48!== undefined) reescrito.ivndfd48  = extraRec.ivndfd48;
+    if (extraRec.de_base !== undefined) reescrito.de_base   = extraRec.de_base;
+    // Minerais (% MS → fração)
+    for (const [k, jk] of [['ca','ca'],['p','p'],['mg','mg'],['k','k'],['na','na'],['cl','cl'],['s','s']]) {
+      if (extraRec[k] !== undefined) reescrito[jk] = parseFloat((extraRec[k] / 100).toFixed(6));
+    }
+    // Microminerais (mg/kg DM — mantém escala)
+    for (const k of ['cu','fe','zn','mo']) {
+      if (extraRec[k] !== undefined) reescrito[k] = extraRec[k];
+    }
+    if (extraRec.mn !== undefined) reescrito.mn_min = extraRec.mn;
+    // Campos Fase 1
+    if (extraRec.dc_st  !== undefined) reescrito.dc_st    = extraRec.dc_st;
+    if (extraRec.dc_fa  !== undefined) reescrito.dc_fa    = extraRec.dc_fa;
+    if (extraRec.npn_cp !== undefined) reescrito.npn_frac = parseFloat((extraRec.npn_cp / 100).toFixed(4));
+    if (extraRec.fa !== undefined && extraRec.fa !== null) {
+      reescrito.fa = parseFloat((extraRec.fa / 100).toFixed(6));
+    }
+    // EE insaturado (Σ frações C16:1 + C18:1 cis/trans + C18:2 + C18:3)
+    if (extraRec.ee_insat !== undefined && extraRec.ee_insat !== null) {
+      reescrito.ee_insat = parseFloat((extraRec.ee_insat / 100).toFixed(6));
+    }
+  }
+
+  // ── Campos DERIVADOS (DEPOIS da sobrescrita CSV) ─────────────────────────
   // PDR e PNDR a partir de RUP da Tabela 19-1 (RUP % CP = % PB que escapa do rúmen)
-  // PNDR = PB × RUP/100  (em fração 0-1 de MS)
-  // PDR  = PB × (100 - RUP)/100  =  PB - PNDR
   if (nasemRec.rup !== null && nasemRec.rup !== undefined && reescrito.pb !== null) {
     reescrito.pndr = parseFloat((reescrito.pb * nasemRec.rup / 100).toFixed(6));
     reescrito.pdr  = parseFloat((reescrito.pb - reescrito.pndr).toFixed(6));
@@ -163,31 +209,12 @@ const novo = atual.map(a => {
     if (cnf >= 0 && cnf <= 1) reescrito.cnf = parseFloat(cnf.toFixed(6));
   }
 
-  // NDT derivado de DE_base: NDT% ≈ DE_base / 0.04409 ÷ 100 (4.409 Mcal/kg = 100% NDT)
-  // Aproximação clássica: NDT% = DE × 22.69 (onde DE em Mcal/kg)  →  fração = DE / 4.409
+  // NDT derivado de DE_base: NDT% ≈ DE_base / 4,409 (4,409 Mcal/kg = 100% NDT)
   if (reescrito.de_base !== null && reescrito.de_base !== undefined) {
     const ndt = reescrito.de_base / 4.409;
     if (ndt >= 0 && ndt <= 1.2) reescrito.ndt = parseFloat(ndt.toFixed(6));
   }
 
-  // ── Enriquecimento CSV NASEM — dc_st, npn_frac, dc_fa, ee_insat ─────────
-  // Estes campos não estão na T19-1 impressa, vêm do feed library oficial.
-  const extraRec = nasemRec.nrc_id ? extra[nasemRec.nrc_id] : null;
-  if (extraRec) {
-    if (extraRec.dc_st  !== undefined) reescrito.dc_st    = extraRec.dc_st;
-    if (extraRec.dc_fa  !== undefined) reescrito.dc_fa    = extraRec.dc_fa;
-    if (extraRec.npn_cp !== undefined) reescrito.npn_frac = parseFloat((extraRec.npn_cp / 100).toFixed(4));
-    if (extraRec.fa !== undefined && extraRec.fa !== null) {
-      reescrito.fa = parseFloat((extraRec.fa / 100).toFixed(6));
-    }
-    // EE insaturado (Σ frações C16:1 + C18:1 cis/trans + C18:2 + C18:3)
-    // Valor em % MS → fração 0-1 no banco
-    if (extraRec.ee_insat !== undefined && extraRec.ee_insat !== null) {
-      reescrito.ee_insat = parseFloat((extraRec.ee_insat / 100).toFixed(6));
-    }
-  }
-
-  // Demais campos (efdn, kd_amido, met, lys, mn8, mn19, vit, etc.) ficam null
   return reescrito;
 });
 
