@@ -377,7 +377,7 @@ export function exportarPDF(dieta: Dieta, alimentos: Alimento[]): void {
   doc.setFont('helvetica', 'italic');
   doc.setFontSize(7.5);
   doc.setTextColor(107, 114, 128);
-  doc.text('Referencias baseadas em NRC (2001/2021). A tolerancia de 10% define a transicao entre Baixo/Alto e Critico.', MARGIN, y);
+  doc.text('Motor de calculo NASEM 2021. Faixas de checagem: NASEM 2021 (dinamico) + NRC 2001 + Rehagro. Tolerancia 10% entre Baixo/Alto e Critico.', MARGIN, y);
 
   // ── RODAPÉ em todas as páginas ───────────────────────────────────────────────
   const total = doc.getNumberOfPages();

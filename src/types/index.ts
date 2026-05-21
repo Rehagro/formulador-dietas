@@ -141,6 +141,14 @@ export interface Referencia {
   max?: number;
   tipo?: string;
   ref?: string;
+  /**
+   * Origem da faixa exibida ao aluno. Categorias:
+   *  - 'NASEM 2021 Cap. X'           → faixa derivada direta de tabela do NASEM 2021.
+   *  - 'NASEM 2021 dinâmico'         → motor calcula requerimento; faixa de %MS é aproximação prática.
+   *  - 'NRC 2001 / Rehagro'          → heurística do NRC 7th ed. + ajustes Rehagro.
+   *  - 'Empírico Rehagro'            → ajuste prático da equipe pedagógica.
+   */
+  fonte?: string;
 }
 
 export interface ResultadoDieta {
@@ -161,7 +169,11 @@ export interface ResultadoDieta {
   dt_me?: number;     // Densidade ME da dieta (Mcal/kg MS) — NASEM 2021 Eq. 20-307
   ee: number;
   ee_insat: number;
+  cinza: number;
+  lignin: number;
   cnf: number;
+  /** Intermediários da cadeia NASEM 2021 — para auditoria/testes, não usado pela UI. */
+  debug?: Record<string, number | undefined>;
   amido: number;
   amido_deg: number;
   met: number;

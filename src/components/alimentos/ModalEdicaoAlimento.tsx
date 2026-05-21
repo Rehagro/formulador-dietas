@@ -328,7 +328,6 @@ export default function ModalEdicaoAlimento({
               <CampoEdit label="Cinza"     sufixo="% MS"     valor={form.cinza}    onChange={set('cinza')} />
               <CampoEdit label="Amido"     sufixo="% MS"     valor={form.amido}    onChange={set('amido')} />
               <CampoEdit label="kd Amido"  sufixo="%/h"      valor={form.kd_amido} onChange={set('kd_amido')} />
-              <CampoEdit label="WSC"       sufixo="% MS"     valor={form.wsc}      onChange={set('wsc')} />
             </div>
           </Grupo>
 
@@ -359,8 +358,7 @@ export default function ModalEdicaoAlimento({
               <CampoLock label="Fração C"            sufixo="%PB"  valor={alimentoBase.prot_c} />
               <CampoLock label="Kd (Fração B)"       sufixo="%/h"  valor={alimentoBase.kd_prot} />
               <CampoLock label="Digest. intestinal RUP" sufixo="%" valor={alimentoBase.rup_digest !== null && alimentoBase.rup_digest !== undefined ? alimentoBase.rup_digest * 100 : null} />
-              <CampoLock label="DFND 48h"            sufixo="%FDN" valor={alimentoBase.ivndfd48} />
-              <CampoLock label="Prot. Solúvel"       sufixo="%PB"  valor={alimentoBase.soluble_protein !== null && alimentoBase.soluble_protein !== undefined ? alimentoBase.soluble_protein * 100 : null} />
+              <CampoLock label="dFDN 48h"            sufixo="%FDN" valor={alimentoBase.ivndfd48} />
               <CampoLock label="ADIP"                sufixo="% MS" valor={alimentoBase.adip !== null && alimentoBase.adip !== undefined ? alimentoBase.adip * 100 : null} />
               <CampoLock label="NDIP"                sufixo="% MS" valor={alimentoBase.ndip !== null && alimentoBase.ndip !== undefined ? alimentoBase.ndip * 100 : null} />
             </div>

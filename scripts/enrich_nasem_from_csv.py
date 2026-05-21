@@ -40,6 +40,7 @@ CSV_FIELDS = [
     ('Fd_CPCRU',  'cpc'),
     ('Fd_KdRUP',  'kd_prot'),
     ('Fd_dcRUP',  'drup'),
+    ('Fd_RUP_base', 'rup_base'),   # % CP que escapa do rúmen (base) — usado para pdr/pndr informativos
     ('Fd_CPs_CP', 'sp'),   # soluble protein % CP
     ('Fd_NDFIP',  'ndip'),
     ('Fd_ADFIP',  'adip'),

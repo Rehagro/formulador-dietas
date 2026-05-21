@@ -196,17 +196,28 @@ export default function PainelAnimal({ animal, onChange }: Props) {
       </div>
 
       {/* ── Método de cálculo da digestibilidade da fibra ────────────────── */}
+      {/*
+        Espelha o seletor "Use in vitro NDF digest to estimate energy" do NASEM
+        Software oficial. Mapeamento direto:
+          'lignin'    ↔ NASEM "Do not use"        (Use_DNDF_IV=0, Eq. 20-112)
+          'iv_forage' ↔ NASEM "Use for forages"   (Use_DNDF_IV=1, Eq. 20-111 só F)
+          'iv_all'    ↔ NASEM "Use for all"       (Use_DNDF_IV=2, Eq. 20-111 tudo)
+      */}
       <div className="mb-3 border border-sky-100 bg-sky-50/40 rounded-lg p-2.5">
         <label className="text-xs font-bold text-sky-800 mb-1.5 flex items-center">
-          🧪 Método de DFND 48h
+          🧪 Usar DFND 48h (in vitro) para estimar energia?
           <CampoTooltip texto={
-            "Define como a digestibilidade da fibra (FDN) é calculada — afeta o leite potencial pela energia.\n\n" +
-            "• Lignina (default): usa a lignina do alimento. Mesmo método do NASEM Software oficial.\n" +
-            "• DFND 48h forragens: usa a DFND 48h medida só nas forragens; concentrados usam lignina.\n" +
-            "• DFND 48h tudo: usa a DFND 48h em todos os alimentos.\n\n" +
-            "DFND 48h é o que vem nos laudos das análises de forragem (digestibilidade in vitro " +
-            "do FDN em 48 horas). Quando você tem o laudo da sua própria silagem/feno, vale escolher " +
-            "DFND 48h forragens para um cálculo mais preciso."
+            "Equivalente ao seletor 'Use in vitro NDF digest to estimate energy' do NASEM " +
+            "Software oficial. Define como a digestibilidade da fibra (dcNDF) é calculada — " +
+            "afeta o leite potencial pela energia.\n\n" +
+            "• Não usar (default): calcula dcNDF pela equação da lignina (Eq. 20-112 NASEM 2021). " +
+            "É o default do NASEM Software — escolha esta se quiser bater out-of-the-box com o software oficial.\n" +
+            "• Sim, só nas forragens: usa o valor de DFND 48h medido no laudo nas forragens; " +
+            "concentrados continuam pela lignina (Eq. 20-111 forragens + 20-112 concentrados).\n" +
+            "• Sim, em todos: usa DFND 48h para todos os alimentos (Eq. 20-111 em tudo).\n\n" +
+            "DFND 48h = digestibilidade in vitro da FDN a 48h (vem nos laudos brasileiros de " +
+            "análise de forragem). Quando você tem o laudo da sua silagem ou feno, vale ativar " +
+            "para forragens — cálculo mais preciso da energia da dieta."
           } />
         </label>
         <select
@@ -214,9 +225,9 @@ export default function PainelAnimal({ animal, onChange }: Props) {
           onChange={e => onChange({ ...animal, ndf_method: e.target.value as AnimalLactacao['ndf_method'] })}
           className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-sky-500"
         >
-          <option value="lignin">Lignina (default — bate com NASEM Software oficial)</option>
-          <option value="iv_forage">DFND 48h só forragens + lignina nos concentrados</option>
-          <option value="iv_all">DFND 48h em todos os alimentos</option>
+          <option value="lignin">Não Usar — Calcular pela lignina</option>
+          <option value="iv_forage">Sim, só nas forragens</option>
+          <option value="iv_all">Sim, em todos os alimentos</option>
         </select>
       </div>
     </div>

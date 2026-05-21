@@ -205,6 +205,10 @@ def feed_to_alimento(name, tipo):
         'fdn': f('Fd_NDF',100), 'fda': f('Fd_ADF',100),
         'amido': f('Fd_St',100), 'ee': f('Fd_CFat',100), 'cinza': f('Fd_Ash',100),
         'lignin': f('Fd_Lg',100),    # necessário para Eq. 20-112
+        'ndip':   f('Fd_NDFIP',100), # N-insoluble protein (% MS) — para Dt_NDFnf e CNF
+        'adip':   f('Fd_ADFIP',100),
+        'soluble_protein': f('Fd_CPs_CP',100),
+        'wsc':    f('Fd_WSC',100),
         # Campos novos Fase 1
         'fa':       f('Fd_FA',100),
         'dc_st':    f('Fd_dcSt'),
@@ -217,9 +221,18 @@ def feed_to_alimento(name, tipo):
         'met': (float(row['Fd_Met_CP'])/100*pb_frac) if pd.notna(row['Fd_Met_CP']) else None,
         'ca': f('Fd_Ca',100), 'p': f('Fd_P',100), 'mg': f('Fd_Mg',100), 'k': f('Fd_K',100),
         'na': f('Fd_Na',100), 'cl': f('Fd_Cl',100), 's': f('Fd_S',100),
-        'pdr': None, 'pndr': None, 'efdn': None, 'fdnf': None, 'nel': None, 'ndt': None,
-        'ee_insat': None, 'cnf': None, 'kd_amido': None,
-        'co': None, 'cu': None, 'mn_min': None, 'zn': None, 'se': None, 'i': None, 'fe': None,
+        # Microminerais: mantém escala mg/kg DM do CSV
+        'cu': f('Fd_Cu'), 'fe': f('Fd_Fe'), 'mn_min': f('Fd_Mn'),
+        'zn': f('Fd_Zn'), 'mo': f('Fd_Mo'),
+        # NDT derivado de DE_base (4,409 Mcal/kg = 100% NDT), idem rebuild_alimentos.mjs
+        'ndt': (f('Fd_DE_Base') / 4.409) if f('Fd_DE_Base') is not None else None,
+        # CNF = 1 - PB - FDN - EE - Cinza (idem rebuild)
+        'cnf': max(0.0, 1 - pb_frac - (f('Fd_NDF',100) or 0) - (f('Fd_CFat',100) or 0)
+                       - (f('Fd_Ash',100) or 0)),
+        # FDNF = FDN se forragem (rebuild calcula isso? não — calculos.ts faz dinâmico)
+        'pdr': None, 'pndr': None, 'efdn': None, 'fdnf': None, 'nel': None,
+        'ee_insat': None, 'kd_amido': None,
+        'co': None, 'se': None, 'i': None,
         'vit_a': None, 'vit_d3': None, 'vit_e': None, 'biotina': None, 'monensina': None,
         'cr': None, 'levedura': None, 'cp_digest': None, 'ndf_digest': None,
         'fat_digest': None, 'lisina_pct': None, 'met_pct': None,
@@ -252,7 +265,7 @@ for name, scen in SCENARIOS.items():
         'del': ai['An_LactDay'],
         'leite': ai['Trg_MilkProd'],
         'gordura': ai['Trg_MilkFatp'],
-        'proteina': ai['Trg_MilkTPp'] / 0.94,
+        'proteina': ai['Trg_MilkTPp'] / 0.95,  # TP→CP via fator NASEM 2021 milk.py:142
         'lactose': ai['Trg_MilkLacp'],
         'precoLeite': 0,
         'raca': 'Holstein',
@@ -263,6 +276,8 @@ for name, scen in SCENARIOS.items():
         'peso_maduro': ai['An_BW_mature'],
         'ganho_frame_kg_dia': ai['Trg_FrmGain'],
         'ganho_reserva_kg_dia': ai['Trg_RsrvGain'],
+        # Método dcNDF — alinhado com NASEM Use_DNDF_IV=0 (Eq. 20-112, lignina)
+        'ndf_method': 'lignin',
     }
     ts_inputs[name] = {
         'description': scen['description'],

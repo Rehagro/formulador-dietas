@@ -119,13 +119,41 @@ export function calcularNelAlimento(a: Alimento): number {
   return 0;
 }
 
+/**
+ * CNF (NFC) per-feed conforme NASEM 2021 (nutrient_intakes.py:191-201):
+ *   Fd_NFC = 100 - Fd_Ash - Fd_NDF - Fd_TP - Fd_NPNDM - Fd_FAhydr
+ *   onde
+ *     Fd_TP     = Fd_CP − Fd_NPNCP   (proteína verdadeira: CP sem NPN)
+ *     Fd_NPNCP  = Fd_CP × Fd_NPN_CP / 100   (NPN como CP-equivalente, % MS)
+ *     Fd_NPNDM  = Fd_NPNCP / 2.81    (NPN expressa como % MS via fator N→CP)
+ *     Fd_FAhydr = Fd_FA / 1.06       (FA após hidrólise éster→glicerol;
+ *                                     Suplementos de FA = Fd_FA × 1)
+ *
+ * Reduzido: NFC = 1 − Ash − NDF − CP + 0,6441 × NPNCP − FA_hydr
+ *           (porque TP + NPNDM = CP − NPNCP × (1 − 1/2,81) = CP − 0,6441 × NPNCP)
+ *
+ * O cálculo dinâmico aqui SUBSTITUI o `a.cnf` estático do banco para garantir
+ * alinhamento bit-a-bit com o NASEM Software oficial. O campo `a.cnf` salvo no
+ * banco fica como referência informativa (Aba Alimentos), mas o agregado da
+ * dieta usa esta função.
+ */
 export function calcularCNFAlimento(a: Alimento): number {
-  if (a.cnf !== null) return a.cnf;
   const fdn = a.fdn ?? 0;
-  const ee = a.ee ?? 0;
-  const cinza = a.cinza ?? 0;
-  const pb = a.pb ?? 0;
-  return Math.max(0, 1 - (fdn + ee + cinza + pb));
+  const ee  = a.ee  ?? 0;
+  const ash = a.cinza ?? 0;
+  const cp  = a.pb  ?? 0;
+  const npn_frac = a.npn_frac ?? 0;            // fração 0-1 (% CP que é NPN)
+  const npn_cp   = cp * npn_frac;              // % MS, escala CP
+  const tp       = cp - npn_cp;                // % MS
+  const npn_dm   = npn_cp / 2.81;              // % MS, escala N+DM
+  const fa       = a.fa ?? (ee * 0.80);        // % MS — fallback 80% do EE
+  // Suplementos de FA puros (óleos) usam fHydr=1, demais usam 1/1.06.
+  // Heurística: se a classificação é "Gordura/Óleo", usa 1; senão divide por 1.06.
+  const isFASupplement =
+    (a.classificacao ?? '').toLowerCase().includes('gordura') ||
+    (a.classificacao ?? '').toLowerCase().includes('óleo');
+  const fa_hydr  = isFASupplement ? fa : fa / 1.06;
+  return Math.max(0, 1 - ash - fdn - tp - npn_dm - fa_hydr);
 }
 
 export function calcularEFDNAlimento(a: Alimento, kgMS: number): number {
@@ -210,6 +238,8 @@ export function calcularResultados(
   let kgVITA = 0, kgVITD3 = 0, kgVITE = 0;
   let kgBIOTINA = 0, kgMONENSINA = 0, kgCR = 0, kgLEVEDURA = 0;
   let kgCinza = 0;        // necessário para rOM (Eq. 20-99) na cadeia de energia
+  let kgLignin = 0;       // agregado da dieta (exibição/relatórios)
+  let kgNDIP = 0;         // NDF-insoluble protein (para Dt_NDFnf = NDF − NDIP)
   let kgFDN8 = 0;          // PSPS (Penn State) — só conta se mn8 preenchido no alimento
   let kgMS_forragem = 0;
   let kgMS_ForWet = 0;     // Dt_ForWet (NASEM): forragens com DM<71% E For>50% (silagens, fresca)
@@ -311,6 +341,8 @@ export function calcularResultados(
       ? (kd_amido / (kd_amido + kPc_pct)) * amido * kgMS
       : 0;
     kgCinza += (a.cinza ?? 0) * kgMS;
+    kgLignin += (a.lignin ?? 0) * kgMS;
+    kgNDIP += (a.ndip ?? 0) * kgMS;
 
     kgMET += (a.met ?? 0) * kgMS;
     kgLYS += (a.lys ?? 0) * kgMS;
@@ -357,7 +389,8 @@ export function calcularResultados(
   //   GrUter_BWgain = (Ksyn − Kdec × t) × GrUter_Wt(t)
   // Em seguida deriva Gest_NPgain (Eq. 20-235) e Gest_REgain (Eq. 20-234).
   let Gest_NPgain_g_pre = 0;
-  let Gest_REgain = 0;  // Mcal NE/d — energia retida no útero
+  let Gest_REgain = 0;       // Mcal NE/d — energia retida no útero
+  let GrUter_BWgain = 0;     // kg/d — exposto para auditoria
   {
     const _dias = animal.dias_gestacao ?? 0;
     const _peso_bez = animal.peso_bezerro_alvo ?? (animal.raca === 'Jersey' ? 28 : 45);
@@ -371,6 +404,7 @@ export function calcularResultados(
       const _GU    = _GU0 * Math.exp(_expo);
       // Eq. 3-17a — rate empírico no dia t (NÃO é derivada de GU):
       const _GUgain = (_Ksyn - _Kdec * _dias) * _GU;
+      GrUter_BWgain     = _GUgain;
       Gest_NPgain_g_pre = _GUgain * 123 * 0.86;
       Gest_REgain       = _GUgain * BODY_PARAMS.NE_GrUtWt;     // Eq. 20-234
     }
@@ -516,16 +550,20 @@ export function calcularResultados(
   //
   // Método de cálculo de dcNDF (NASEM Use_DNDF_IV):
   //   'lignin'    → Eq. 20-112 (Van Soest, baseada em lignina) — DEFAULT NASEM oficial
-  //   'iv_forage' → Eq. 20-111 (DFND 48h) só forragens; lignina nos concentrados
-  //   'iv_all'    → Eq. 20-111 (DFND 48h) para todos
+  //   'iv_forage' → Eq. 20-111 (dFDN 48h) só forragens; lignina nos concentrados
+  //   'iv_all'    → Eq. 20-111 (dFDN 48h) para todos
   // Default 'lignin' garante que nossos números batem com o NASEM Software oficial
   // out-of-the-box. O aluno pode trocar para 'iv_all' usando os valores da Tabela
-  // 19-1 (mais informativo) ou customizar DFND 48h dos alimentos.
+  // 19-1 (mais informativo) ou customizar dFDN 48h dos alimentos.
   const ndf_method: NonNullable<AnimalLactacao['ndf_method']> =
     animal.ndf_method ?? 'lignin';
 
   let An_DEIn = 0, An_MEIn = 0, An_NEIn = 0;
   let Dt_DigNDFIn = 0, Dt_DigStIn = 0, Dt_DigFAIn = 0, An_DigCPaIn = 0, Dt_DigrOMIn = 0;
+  // Intermediários expostos para auditoria (debug)
+  let Ur_DEIn = 0, An_GasEOut = 0;
+  let Ur_N_g = 0, Scrf_CP_g_aud = 0, Fe_CP_total_aud = 0;
+  let TT_dcSt_aud = 0;
   if (totalKgMS > 0) {
     // 1) Total Tract NDF (Eq. 20-111 ou 20-112 conforme ndf_method; ajustes 20-115)
     let Dt_DigNDFIn_Base_kg = 0;
@@ -560,6 +598,7 @@ export function calcularResultados(
     const TT_dcSt_Base = kgAMIDO > 0 ? Dt_DigStIn_Base / kgAMIDO : 0;
     const TT_dcSt = Math.max(0,
       TT_dcSt_Base - (totalKgMS / animal.peso - 0.035));   // ajuste DMI/BW
+    TT_dcSt_aud = TT_dcSt;
     Dt_DigStIn = TT_dcSt * kgAMIDO;
 
     // 3) FA digestion — Fase 1.2: usa Fd_FA (FA verdadeira); fallback 80%×EE.
@@ -626,15 +665,19 @@ export function calcularResultados(
 
     // 7) Urinary energy — Fase 1.3: fórmula NASEM completa (urine.py:11-22).
     //    Ur_Nout_g = (Dt_CP − Fe_CP_total − Scrf_CP − Fe_CPend − Mlk_CP − Body − Gest)/6.25
-    const Fe_CP_total   = Math.max(0, kgPB - An_DigCPaIn);
-    const Scrf_CP_g     = 0.20 * Math.pow(animal.peso, 0.60); // CP equiv, Body_NP_CP=0.86
-    const Body_CPgain_g = 0;  // ECC estável (Fase 5 implementará Body_MPuse)
+    Fe_CP_total_aud = Math.max(0, kgPB - An_DigCPaIn);
+    Scrf_CP_g_aud   = 0.20 * Math.pow(animal.peso, 0.60); // CP equiv, Body_NP_CP=0.86
+    // Body CP gain: derivado de Body_NPgain (Frm + Rsrv, Fase 5 calculada acima).
+    //   Body_CPgain_g = Body_NPgain_g / Body_NP_CP (0.86) — `urine.py:11-22` NASEM.
+    // Antes era 0 hardcoded; bug descoberto na auditoria (vaca em ganho ativo subtraia
+    // 20 g/d a menos no balanço de N → erro propagado em Ur_DEout e ME).
+    const Body_CPgain_g = Body_NPgain_g / 0.86;
     const Gest_CPuse_g  = Gest_NPgain_g_pre / 0.86;  // NP → CP via Body_NP_CP
     const Milk_CP_g     = animal.leite * animal.proteina * 10;  // g/d
-    const Ur_N_g        = Math.max(0,
-      (kgPB * 1000 - Fe_CP_total * 1000 - Scrf_CP_g - Fe_CPend * 1000
+    Ur_N_g = Math.max(0,
+      (kgPB * 1000 - Fe_CP_total_aud * 1000 - Scrf_CP_g_aud - Fe_CPend * 1000
        - Milk_CP_g - Body_CPgain_g - Gest_CPuse_g) / 6.25);
-    const Ur_DEIn       = 0.0143 * Ur_N_g;
+    Ur_DEIn = 0.0143 * Ur_N_g;
 
     // 8) Gas energy — vaca lactando (Eq. 20-310, `animal.py:169-180` nasem_dairy)
     //   An_GasEOut_Lact = 0.294 × DMI − 0.347 × (Dt_FAIn / DMI × 100) + 0.0409 × An_DigNDF
@@ -642,7 +685,7 @@ export function calcularResultados(
     //   An_DigNDF é dNDF / DMI × 100 (% MS).
     const FA_pctMS    = (kgFA / totalKgMS) * 100;
     const dNDF_pctMS  = (Dt_DigNDFIn / totalKgMS) * 100;
-    const An_GasEOut  = 0.294 * totalKgMS - 0.347 * FA_pctMS + 0.0409 * dNDF_pctMS;
+    An_GasEOut  = 0.294 * totalKgMS - 0.347 * FA_pctMS + 0.0409 * dNDF_pctMS;
     // Nota: redução de 5% se monensina presente (Eq. 20-310 nota) — não aplicada v1
 
     // 9) ME (Eq. 20-307) e NEL (Eq. 20-223)
@@ -653,19 +696,29 @@ export function calcularResultados(
   // Densidade NEL exibida (Mcal/kg MS) — vem da cadeia NASEM, com fallback legacy
   const nel_mcal_kg = An_NEIn > 0 ? An_NEIn / ms : kgNEL / ms;
 
+  // ── NDT (Dt_TDN) dinâmico NASEM 2021 (nutrient_intakes.py:2402-2414) ──────
+  //   Dt_TDN = (Dt_DigSt + Dt_DigNDF + Dt_DigrOMa + Dt_DigCPa + Dt_DigFA × 2.25)
+  //            / DMI × 100
+  // Fallback: somatório estático Σ ndt_alimento × kgMS / ms se a cadeia não rodou.
+  const ndt_dinamico_pct = ms > 0 && An_DEIn > 0
+    ? ((Dt_DigNDFIn + Dt_DigStIn + An_DigCPaIn + Dt_DigFAIn * 2.25 + Dt_DigrOMIn) / ms) * 100
+    : null;
+  const ndt_resultado = ndt_dinamico_pct !== null ? ndt_dinamico_pct / 100 : kgNDT / ms;
+
   // ── Leite potencial pela energia (NASEM 2021 milk.py:329-365) ──────────────
   // Mlk_Prod_NEalow = An_MEavail_Milk × Kl_ME_NE / Trg_NEmilk_Milk
   // onde An_MEavail_Milk = An_MEIn − An_MEmUse − An_MEgain − Gest_MEuse
   // e An_MEmUse = NEmantenca / Km_ME_NE (Km_ME_NE = 0,66 para vaca)
   //
   // Trg_NEmilk_Milk (Eq. 3-14b): 9,29×Fat% + 5,85×TP% + 3,95×Lact% / 100.
-  // Nosso `animal.proteina` é CP%; converte para TP via × 0,94.
+  // Nosso `animal.proteina` é CP%; converte para TP via × 0,95 (Mlk_NP_CP NASEM
+  // 2021 — milk.py:142). Antes era 0,94 — diff descoberta na auditoria.
   const nelMantenca       = 0.10 * Math.pow(animal.peso, 0.75);                // Eq. 3-13
   const Km_ME_NE          = 0.66;
   const Kl_ME_NE          = 0.66;
   const An_MEmUse         = nelMantenca / Km_ME_NE;
   const An_MEavail_Milk   = Math.max(0, An_MEIn - An_MEmUse - An_MEgain - Gest_MEuse);
-  const Trg_MilkTPp       = animal.proteina * 0.94;
+  const Trg_MilkTPp       = animal.proteina * 0.95;
   const nel_por_kg_leite  = 9.29 * animal.gordura / 100
                           + 5.85 * Trg_MilkTPp    / 100
                           + 3.95 * animal.lactose / 100;
@@ -714,11 +767,13 @@ export function calcularResultados(
     fdnf: kgFDNF / ms,
     fda: kgFDA / ms,
     nel: nel_mcal_kg,
-    ndt: kgNDT / ms,
+    ndt: ndt_resultado,
     dt_de: An_DEIn > 0 ? An_DEIn / ms : undefined,
     dt_me: An_MEIn > 0 ? An_MEIn / ms : undefined,
     ee: kgEE / ms,
     ee_insat: kgEE_INSAT / ms,
+    cinza: kgCinza / ms,
+    lignin: kgLignin / ms,
     cnf: kgCNF / ms,
     amido: kgAMIDO / ms,
     // Amido degradável no rúmen: NASEM 2021 Eq. 20-53 (Rum_dcSt × kgAMIDO).
@@ -766,6 +821,53 @@ export function calcularResultados(
     custoTotal,
     custoKgMS,
     custoLitro,
+    // Intermediários expostos para auditoria contra NASEM oficial (não usados na UI)
+    debug: {
+      // Parte 1 — composição
+      kgFA, kgNPN_CP,
+      Dt_NDFnf: ((kgFDN - kgNDIP) / ms) * 100,  // NDF nitrogen-free em % MS (= NASEM Dt_NDFnf)
+      Dt_TDNIn: (ndt_resultado * ms),
+      // Parte 2 — cadeia digestibilidade e energia
+      Dt_DigNDFIn, Dt_DigStIn, Dt_DigFAIn, An_DigCPaIn, Dt_DigrOMIn,
+      An_DEIn, An_MEIn, An_NEIn, Ur_DEIn, An_GasEOut,
+      // Parte 3 — proteína microbiana e MP
+      An_RDPIn, An_idRUPIn,
+      An_RUPIn_total: kgPNDR,         // RUP bruto (= Σ kgRUP_f) = NASEM An_RUPIn
+      Dt_RUPIn:       kgPNDR,         // sinônimo NASEM
+      Dt_idRUPIn:     An_idRUPIn,
+      Du_MiCP_g:      Du_MiCP * 1000, Du_MiCP,
+      Du_idMiTP_g:    Du_idMiTP * 1000,
+      Du_idMiCP_g:    Du_idMiTP * 1000 / 0.824,  // NASEM: idMiCP = idMiTP / fMiTP_MiCP(0.824)
+      Du_MiN_g:       (Du_MiCP * 1000) / 6.25,
+      An_MPIn,
+      An_MPIn_g:      An_MPIn * 1000,
+      Fe_CPend,
+      Fe_CPend_g:     Fe_CPend * 1000,
+      Scrf_CP_g:      Scrf_CP_g_aud,
+      Ur_N_g,
+      // Parte 4 — mantença, ganho, gestação
+      nelMantenca,
+      An_MEmUse, An_MEgain,
+      Frm_NEgain, Rsrv_NEgain,
+      Frm_NPgain_g:  Frm_NPgain * 1000,
+      Rsrv_NPgain_g: Rsrv_NPgain * 1000,
+      GrUter_BWgain, Gest_NPgain_g:    Gest_NPgain_g_pre,
+      Gest_MEuse,    Gest_MPuse_g:     Gest_MPuse * 1000,
+      Body_MPuse_g:  Body_MPuse_g,
+      mp_mantenca_g: mp_mantenca * 1000,
+      Body_NPgain_g,
+      // Coeficientes de digestibilidade efetivos
+      TT_dcSt: TT_dcSt_aud * 100,   // % MS
+      // Parte 5 — Leite Potencial
+      An_MEavail_Milk,
+      nel_por_kg_leite,             // Mcal/kg (= NASEM Trg_NEmilk_Milk)
+      An_MPavailMilk,               // kg/d (= NASEM An_MPavailMilk_Trg)
+      Trg_MilkTPp,                  // %  (= NASEM Trg_MilkTPp)
+      Trg_MilkFatp:  animal.gordura,
+      Trg_MilkLacp:  animal.lactose,
+      leite_potencial_nel,
+      leite_potencial_prot,
+    },
   };
 }
 

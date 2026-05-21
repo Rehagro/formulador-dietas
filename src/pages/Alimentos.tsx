@@ -36,13 +36,11 @@ const GRUPOS: GrupoCols[] = [
     { label: 'CNF %',    render: a => a.cnf !== null ? pct1(a.cnf) : '—' },
     { label: 'Amido %',  render: a => a.amido !== null ? pct1(a.amido) : '—' },
     { label: 'kd Amid',  render: a => a.kd_amido !== null ? num(a.kd_amido, 1) : '—' },
-    { label: 'WSC %',    render: a => a.wsc !== null && a.wsc !== undefined ? pct1(a.wsc) : '—' },
   ]},
   { label: 'Proteína', cols: [
     { label: 'PB %',     render: a => pct(a.pb) },
     { label: 'PDR %',    render: a => pct(calcPDR(a)) },
     { label: 'PNDR %',   render: a => a.pndr !== null ? pct(a.pndr) : '—' },
-    { label: 'Sol %PB',  render: a => a.soluble_protein !== null && a.soluble_protein !== undefined ? pct1(a.soluble_protein) : '—' },
     { label: 'ADIP %',   render: a => a.adip !== null && a.adip !== undefined ? pct(a.adip) : '—' },
     { label: 'NDIP %',   render: a => a.ndip !== null && a.ndip !== undefined ? pct(a.ndip) : '—' },
   ]},

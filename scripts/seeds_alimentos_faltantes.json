@@ -1,0 +1,682 @@
+[
+  {
+    "nome": "Núcleo Crescimento Bezerros, 14% PB",
+    "custo": null,
+    "classificacao": "Outros",
+    "tipo": "C",
+    "fonte_nasem": "Calf grower 14CP (Fed to calves only)",
+    "alimento_base": null
+  },
+  {
+    "nome": "Núcleo Crescimento Bezerros, 16% PB",
+    "custo": null,
+    "classificacao": "Outros",
+    "tipo": "C",
+    "fonte_nasem": "Calf grower 16CP (Fed to calves only)",
+    "alimento_base": null
+  },
+  {
+    "nome": "Núcleo Inicial Bezerros, 18% PB, Alto Amido",
+    "custo": null,
+    "classificacao": "Outros",
+    "tipo": "C",
+    "fonte_nasem": "Calf starter 18CP high starch (Fed to calves only)",
+    "alimento_base": null
+  },
+  {
+    "nome": "Núcleo Inicial Bezerros, 18% PB, Baixo Amido",
+    "custo": null,
+    "classificacao": "Outros",
+    "tipo": "C",
+    "fonte_nasem": "Calf starter 18CP low starch (Fed to calves only)",
+    "alimento_base": null
+  },
+  {
+    "nome": "Núcleo Inicial Bezerros, 22% PB, Alto Amido",
+    "custo": null,
+    "classificacao": "Outros",
+    "tipo": "C",
+    "fonte_nasem": "Calf starter 22CP high starch (Fed to calves only)",
+    "alimento_base": null
+  },
+  {
+    "nome": "Núcleo Inicial Bezerros, 22% PB, Médio Amido",
+    "custo": null,
+    "classificacao": "Outros",
+    "tipo": "C",
+    "fonte_nasem": "Calf starter 22CP med starch (Fed to calves only)",
+    "alimento_base": null
+  },
+  {
+    "nome": "Caseína",
+    "custo": null,
+    "classificacao": "Proteico",
+    "tipo": "C",
+    "fonte_nasem": "Casein",
+    "alimento_base": null
+  },
+  {
+    "nome": "Substituto do Leite, 20% PB / 20% Gordura",
+    "custo": null,
+    "classificacao": "Outros",
+    "tipo": "C",
+    "fonte_nasem": "Milk replacer 20 CP 20 fat",
+    "alimento_base": null
+  },
+  {
+    "nome": "Substituto do Leite, 26% PB / 17% Gordura",
+    "custo": null,
+    "classificacao": "Outros",
+    "tipo": "C",
+    "fonte_nasem": "Milk replacer 26 CP 17 fat",
+    "alimento_base": null
+  },
+  {
+    "nome": "Substituto do Leite, 28% PB / 17,5% Gordura",
+    "custo": null,
+    "classificacao": "Outros",
+    "tipo": "C",
+    "fonte_nasem": "Milk replacer 28 CP 17.5 fat",
+    "alimento_base": null
+  },
+  {
+    "nome": "Leite Desnatado Fresco",
+    "custo": null,
+    "classificacao": "Outros",
+    "tipo": "C",
+    "fonte_nasem": "Skim milk, fresh",
+    "alimento_base": null
+  },
+  {
+    "nome": "Leite Desnatado em Pó",
+    "custo": null,
+    "classificacao": "Outros",
+    "tipo": "C",
+    "fonte_nasem": "Skim milk, powder",
+    "alimento_base": null
+  },
+  {
+    "nome": "Concentrado Proteico de Soro de Leite",
+    "custo": null,
+    "classificacao": "Proteico",
+    "tipo": "C",
+    "fonte_nasem": "Whey protein concentrate",
+    "alimento_base": null
+  },
+  {
+    "nome": "Soro de Leite, Deslactosado",
+    "custo": null,
+    "classificacao": "Proteico",
+    "tipo": "C",
+    "fonte_nasem": "Whey, delactosed",
+    "alimento_base": null
+  },
+  {
+    "nome": "Soro de Leite Fresco",
+    "custo": null,
+    "classificacao": "Outros",
+    "tipo": "C",
+    "fonte_nasem": "Whey, fresh",
+    "alimento_base": null
+  },
+  {
+    "nome": "Permeado de Soro de Leite",
+    "custo": null,
+    "classificacao": "Outros",
+    "tipo": "C",
+    "fonte_nasem": "Whey, permeate",
+    "alimento_base": null
+  },
+  {
+    "nome": "Leite Integral",
+    "custo": null,
+    "classificacao": "Outros",
+    "tipo": "C",
+    "fonte_nasem": "Whole milk",
+    "alimento_base": null
+  },
+  {
+    "nome": "Bagaço ou Subproduto de Maçã, Úmido",
+    "custo": null,
+    "classificacao": "Outros",
+    "tipo": "C",
+    "fonte_nasem": "Apple pomace or byproduct, wet",
+    "alimento_base": null
+  },
+  {
+    "nome": "Resíduo de Panificação",
+    "custo": null,
+    "classificacao": "Energético",
+    "tipo": "C",
+    "fonte_nasem": "Bakery byproduct",
+    "alimento_base": null
+  },
+  {
+    "nome": "Resíduo de Panificação, Pão",
+    "custo": null,
+    "classificacao": "Energético",
+    "tipo": "C",
+    "fonte_nasem": "Bakery byproduct, bread waste",
+    "alimento_base": null
+  },
+  {
+    "nome": "Resíduo de Panificação, Cereais",
+    "custo": null,
+    "classificacao": "Energético",
+    "tipo": "C",
+    "fonte_nasem": "Bakery byproduct, cereal",
+    "alimento_base": null
+  },
+  {
+    "nome": "Resíduo de Panificação, Biscoitos",
+    "custo": null,
+    "classificacao": "Energético",
+    "tipo": "C",
+    "fonte_nasem": "Bakery byproduct, cookies",
+    "alimento_base": null
+  },
+  {
+    "nome": "Silagem de Capim Bermuda, Meia Maturação",
+    "custo": null,
+    "classificacao": "Forrageiro",
+    "tipo": "F",
+    "fonte_nasem": "Bermudagrass silage, mid-mtr",
+    "alimento_base": null
+  },
+  {
+    "nome": "Resíduo de Confeitaria (sem chocolate)",
+    "custo": null,
+    "classificacao": "Energético",
+    "tipo": "C",
+    "fonte_nasem": "Candy (not chocolate) byproduct",
+    "alimento_base": null
+  },
+  {
+    "nome": "Resíduo de Confeitaria, Alta Proteína",
+    "custo": null,
+    "classificacao": "Proteico",
+    "tipo": "C",
+    "fonte_nasem": "Candy byproduct, high protein",
+    "alimento_base": null
+  },
+  {
+    "nome": "Resíduo de Chocolate",
+    "custo": null,
+    "classificacao": "Energético",
+    "tipo": "C",
+    "fonte_nasem": "Chocolate byproduct",
+    "alimento_base": null
+  },
+  {
+    "nome": "Feno de Gramínea de Estação Fria, Maduro",
+    "custo": null,
+    "classificacao": "Forrageiro",
+    "tipo": "F",
+    "fonte_nasem": "Cool season grass hay, mature",
+    "alimento_base": null
+  },
+  {
+    "nome": "Feno de Gramínea de Estação Fria, Meia Maturação",
+    "custo": null,
+    "classificacao": "Forrageiro",
+    "tipo": "F",
+    "fonte_nasem": "Cool season grass hay, mid-mtr",
+    "alimento_base": null
+  },
+  {
+    "nome": "Silagem de Gramínea de Estação Fria",
+    "custo": null,
+    "classificacao": "Forrageiro",
+    "tipo": "F",
+    "fonte_nasem": "Cool season grass silage",
+    "alimento_base": null
+  },
+  {
+    "nome": "Grão de Milho Úmido, Moagem Grossa",
+    "custo": null,
+    "classificacao": "Energético",
+    "tipo": "C",
+    "fonte_nasem": "Corn grain HM, coarse grind",
+    "alimento_base": null
+  },
+  {
+    "nome": "Grão de Milho Úmido, Moagem Fina",
+    "custo": null,
+    "classificacao": "Energético",
+    "tipo": "C",
+    "fonte_nasem": "Corn grain HM, fine grind",
+    "alimento_base": null
+  },
+  {
+    "nome": "Espiga de Milho com Palha e Colmo, Alta Fibra",
+    "custo": null,
+    "classificacao": "Energético",
+    "tipo": "C",
+    "fonte_nasem": "Corn, ear w husk, stlk, hi fbr",
+    "alimento_base": null
+  },
+  {
+    "nome": "Espiga de Milho com Palha e Colmo, Baixa Fibra",
+    "custo": null,
+    "classificacao": "Energético",
+    "tipo": "C",
+    "fonte_nasem": "Corn, ear, huks, stlk, low fbr",
+    "alimento_base": null
+  },
+  {
+    "nome": "Grãos de Destilaria com Solúveis, Alta Gordura",
+    "custo": null,
+    "classificacao": "Proteico",
+    "tipo": "C",
+    "fonte_nasem": "DDGS, high fat",
+    "alimento_base": null
+  },
+  {
+    "nome": "Grãos de Destilaria com Solúveis, Alta Proteína",
+    "custo": null,
+    "classificacao": "Proteico",
+    "tipo": "C",
+    "fonte_nasem": "DDGS, high protein",
+    "alimento_base": null
+  },
+  {
+    "nome": "Grãos de Destilaria com Solúveis, Baixa Gordura",
+    "custo": null,
+    "classificacao": "Proteico",
+    "tipo": "C",
+    "fonte_nasem": "DDGS, low fat",
+    "alimento_base": null
+  },
+  {
+    "nome": "Grãos de Destilaria, Modificado",
+    "custo": null,
+    "classificacao": "Proteico",
+    "tipo": "C",
+    "fonte_nasem": "DGS modified",
+    "alimento_base": null
+  },
+  {
+    "nome": "Grãos de Destilaria, Úmido",
+    "custo": null,
+    "classificacao": "Proteico",
+    "tipo": "C",
+    "fonte_nasem": "DGS wet",
+    "alimento_base": null
+  },
+  {
+    "nome": "Banha de Porco",
+    "custo": null,
+    "classificacao": "Aditivo",
+    "tipo": "C",
+    "fonte_nasem": "Fat, lard",
+    "alimento_base": null
+  },
+  {
+    "nome": "Óleo de Cártamo",
+    "custo": null,
+    "classificacao": "Aditivo",
+    "tipo": "C",
+    "fonte_nasem": "Fat, safflower oil",
+    "alimento_base": null
+  },
+  {
+    "nome": "Sebo Bovino",
+    "custo": null,
+    "classificacao": "Aditivo",
+    "tipo": "C",
+    "fonte_nasem": "Fat, tallow",
+    "alimento_base": null
+  },
+  {
+    "nome": "Resíduo de Frutas e Vegetais, Úmido",
+    "custo": null,
+    "classificacao": "Outros",
+    "tipo": "C",
+    "fonte_nasem": "Fruit and vegetable byprod, wet",
+    "alimento_base": null
+  },
+  {
+    "nome": "Glicerol",
+    "custo": null,
+    "classificacao": "Energético",
+    "tipo": "C",
+    "fonte_nasem": "Glycerol",
+    "alimento_base": null
+  },
+  {
+    "nome": "Peneirado de Grãos, Origem Desconhecida",
+    "custo": null,
+    "classificacao": "Energético",
+    "tipo": "C",
+    "fonte_nasem": "Grain screenings, source unknwn",
+    "alimento_base": null
+  },
+  {
+    "nome": "Silagem de Sorgo Granífero, Madura",
+    "custo": null,
+    "classificacao": "Forrageiro",
+    "tipo": "F",
+    "fonte_nasem": "Grain sorghum silage, mature",
+    "alimento_base": null
+  },
+  {
+    "nome": "Silagem de Sorgo Granífero, Meia Maturação",
+    "custo": null,
+    "classificacao": "Forrageiro",
+    "tipo": "F",
+    "fonte_nasem": "Grain sorghum silage, midmtr",
+    "alimento_base": null
+  },
+  {
+    "nome": "Silagem Mista Gramínea-Leguminosa, Predomínio Gramínea",
+    "custo": null,
+    "classificacao": "Forrageiro",
+    "tipo": "F",
+    "fonte_nasem": "Grass legume mixt, grass slg",
+    "alimento_base": null
+  },
+  {
+    "nome": "Feno Misto Gramínea-Leguminosa, Predomínio Gramínea, Meia Maturação",
+    "custo": null,
+    "classificacao": "Forrageiro",
+    "tipo": "F",
+    "fonte_nasem": "Grass lg mixt, grass hay, mid",
+    "alimento_base": null
+  },
+  {
+    "nome": "Feno Misto Gramínea-Leguminosa, Predomínio Gramínea, Maduro",
+    "custo": null,
+    "classificacao": "Forrageiro",
+    "tipo": "F",
+    "fonte_nasem": "Grass lg mixt, grass hay, mtr",
+    "alimento_base": null
+  },
+  {
+    "nome": "Feno Misto Gramínea-Leguminosa, Predomínio Leguminosa, Maduro",
+    "custo": null,
+    "classificacao": "Forrageiro",
+    "tipo": "F",
+    "fonte_nasem": "Grass lg mixt, leg. hay, mtr",
+    "alimento_base": null
+  },
+  {
+    "nome": "Feno Misto Gramínea-Leguminosa, Predomínio Leguminosa, Imaturo",
+    "custo": null,
+    "classificacao": "Forrageiro",
+    "tipo": "F",
+    "fonte_nasem": "Grass lg mixt, leg., hay, immtr",
+    "alimento_base": null
+  },
+  {
+    "nome": "Silagem Mista Gramínea-Leguminosa, Predomínio Leguminosa",
+    "custo": null,
+    "classificacao": "Forrageiro",
+    "tipo": "F",
+    "fonte_nasem": "Grass lg mixt, legume slg",
+    "alimento_base": null
+  },
+  {
+    "nome": "Feno Misto Gramínea-Leguminosa",
+    "custo": null,
+    "classificacao": "Forrageiro",
+    "tipo": "F",
+    "fonte_nasem": "Grass lg mixt, mix hay",
+    "alimento_base": null
+  },
+  {
+    "nome": "Silagem Mista Gramínea-Leguminosa",
+    "custo": null,
+    "classificacao": "Forrageiro",
+    "tipo": "F",
+    "fonte_nasem": "Grass lg mixt, mix silage",
+    "alimento_base": null
+  },
+  {
+    "nome": "Pasto, Gramínea",
+    "custo": null,
+    "classificacao": "Forrageiro",
+    "tipo": "F",
+    "fonte_nasem": "Pasture, grass",
+    "alimento_base": null
+  },
+  {
+    "nome": "Pasto, Mistura Gramínea-Leguminosa",
+    "custo": null,
+    "classificacao": "Forrageiro",
+    "tipo": "F",
+    "fonte_nasem": "Pasture, grass-legume mixture",
+    "alimento_base": null
+  },
+  {
+    "nome": "Pasto, Leguminosa",
+    "custo": null,
+    "classificacao": "Forrageiro",
+    "tipo": "F",
+    "fonte_nasem": "Pasture, legume",
+    "alimento_base": null
+  },
+  {
+    "nome": "Tegumento de Amendoim",
+    "custo": null,
+    "classificacao": "Outros",
+    "tipo": "C",
+    "fonte_nasem": "Peanut skins",
+    "alimento_base": null
+  },
+  {
+    "nome": "Resíduo de Batata",
+    "custo": null,
+    "classificacao": "Energético",
+    "tipo": "C",
+    "fonte_nasem": "Potato byproduct",
+    "alimento_base": null
+  },
+  {
+    "nome": "Farinha de Subproduto de Aves",
+    "custo": null,
+    "classificacao": "Proteico",
+    "tipo": "C",
+    "fonte_nasem": "Poultry byproduct meal",
+    "alimento_base": null
+  },
+  {
+    "nome": "Arginina Protegida do Rúmen",
+    "custo": null,
+    "classificacao": "Aditivo",
+    "tipo": "C",
+    "fonte_nasem": "Rumen Protected Arg",
+    "alimento_base": null
+  },
+  {
+    "nome": "Histidina Protegida do Rúmen",
+    "custo": null,
+    "classificacao": "Aditivo",
+    "tipo": "C",
+    "fonte_nasem": "Rumen Protected His",
+    "alimento_base": null
+  },
+  {
+    "nome": "Isoleucina Protegida do Rúmen",
+    "custo": null,
+    "classificacao": "Aditivo",
+    "tipo": "C",
+    "fonte_nasem": "Rumen Protected Ile",
+    "alimento_base": null
+  },
+  {
+    "nome": "Leucina Protegida do Rúmen",
+    "custo": null,
+    "classificacao": "Aditivo",
+    "tipo": "C",
+    "fonte_nasem": "Rumen Protected Leu",
+    "alimento_base": null
+  },
+  {
+    "nome": "Lisina Protegida do Rúmen, NASEM",
+    "custo": null,
+    "classificacao": "Aditivo",
+    "tipo": "C",
+    "fonte_nasem": "Rumen Protected Lys",
+    "alimento_base": null
+  },
+  {
+    "nome": "Metionina Protegida do Rúmen",
+    "custo": null,
+    "classificacao": "Aditivo",
+    "tipo": "C",
+    "fonte_nasem": "Rumen Protected Met",
+    "alimento_base": null
+  },
+  {
+    "nome": "Fenilalanina Protegida do Rúmen",
+    "custo": null,
+    "classificacao": "Aditivo",
+    "tipo": "C",
+    "fonte_nasem": "Rumen Protected Phe",
+    "alimento_base": null
+  },
+  {
+    "nome": "Treonina Protegida do Rúmen",
+    "custo": null,
+    "classificacao": "Aditivo",
+    "tipo": "C",
+    "fonte_nasem": "Rumen Protected Thr",
+    "alimento_base": null
+  },
+  {
+    "nome": "Triptofano Protegido do Rúmen",
+    "custo": null,
+    "classificacao": "Aditivo",
+    "tipo": "C",
+    "fonte_nasem": "Rumen Protected Trp",
+    "alimento_base": null
+  },
+  {
+    "nome": "Valina Protegida do Rúmen",
+    "custo": null,
+    "classificacao": "Aditivo",
+    "tipo": "C",
+    "fonte_nasem": "Rumen Protected Val",
+    "alimento_base": null
+  },
+  {
+    "nome": "Centeio Anual Verde, Imaturo",
+    "custo": null,
+    "classificacao": "Forrageiro",
+    "tipo": "F",
+    "fonte_nasem": "Rye annual fresh, immature",
+    "alimento_base": null
+  },
+  {
+    "nome": "Centeio Anual Verde, Meia Maturação",
+    "custo": null,
+    "classificacao": "Forrageiro",
+    "tipo": "F",
+    "fonte_nasem": "Rye annual fresh, mid-maturity",
+    "alimento_base": null
+  },
+  {
+    "nome": "Feno de Centeio Anual, Meia Maturação",
+    "custo": null,
+    "classificacao": "Forrageiro",
+    "tipo": "F",
+    "fonte_nasem": "Rye annual hay, mid-maturity",
+    "alimento_base": null
+  },
+  {
+    "nome": "Silagem de Centeio Anual, Imaturo",
+    "custo": null,
+    "classificacao": "Forrageiro",
+    "tipo": "F",
+    "fonte_nasem": "Rye annual silage, immature",
+    "alimento_base": null
+  },
+  {
+    "nome": "Silagem de Centeio Anual, Meia Maturação",
+    "custo": null,
+    "classificacao": "Forrageiro",
+    "tipo": "F",
+    "fonte_nasem": "Rye annual silage, mid-maturity",
+    "alimento_base": null
+  },
+  {
+    "nome": "Silagem de Sorgo Forrageiro, Imaturo",
+    "custo": null,
+    "classificacao": "Forrageiro",
+    "tipo": "F",
+    "fonte_nasem": "Sorghum forage silage, immature",
+    "alimento_base": null
+  },
+  {
+    "nome": "Silagem de Sorgo Forrageiro, Maduro",
+    "custo": null,
+    "classificacao": "Forrageiro",
+    "tipo": "F",
+    "fonte_nasem": "Sorghum forage silage, mature",
+    "alimento_base": null
+  },
+  {
+    "nome": "Grão de Sorgo, Seco, Moído",
+    "custo": null,
+    "classificacao": "Energético",
+    "tipo": "C",
+    "fonte_nasem": "Sorghum grain, dry, ground",
+    "alimento_base": null
+  },
+  {
+    "nome": "Grão de Sorgo, Laminado a Vapor",
+    "custo": null,
+    "classificacao": "Energético",
+    "tipo": "C",
+    "fonte_nasem": "Sorghum grain, steam flaked",
+    "alimento_base": null
+  },
+  {
+    "nome": "Casca de Soja",
+    "custo": null,
+    "classificacao": "Forrageiro",
+    "tipo": "C",
+    "fonte_nasem": "Soybean hulls",
+    "alimento_base": null
+  },
+  {
+    "nome": "Farelo de Soja, Solvente 48% PB",
+    "custo": null,
+    "classificacao": "Proteico",
+    "tipo": "C",
+    "fonte_nasem": "Soybean meal, solvent 48CP",
+    "alimento_base": null
+  },
+  {
+    "nome": "Açúcar",
+    "custo": null,
+    "classificacao": "Energético",
+    "tipo": "C",
+    "fonte_nasem": "Sugar",
+    "alimento_base": null
+  },
+  {
+    "nome": "Silagem de Triticale, Meia Maturação",
+    "custo": null,
+    "classificacao": "Forrageiro",
+    "tipo": "F",
+    "fonte_nasem": "Triticale silage, mid-maturity",
+    "alimento_base": null
+  },
+  {
+    "nome": "Soro de Leite, Seco",
+    "custo": null,
+    "classificacao": "Proteico",
+    "tipo": "C",
+    "fonte_nasem": "Whey, dry",
+    "alimento_base": null
+  },
+  {
+    "nome": "Soro de Leite, Úmido",
+    "custo": null,
+    "classificacao": "Proteico",
+    "tipo": "C",
+    "fonte_nasem": "Whey, wet",
+    "alimento_base": null
+  }
+]

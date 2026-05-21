@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "audit-nasem": "py -3.12 scripts/validate_multi_scenarios.py && node --experimental-strip-types scripts/validate_multi_ts.mjs && py -3.12 scripts/audit_nasem_to_md.py"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.103.2",

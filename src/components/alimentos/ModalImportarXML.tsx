@@ -135,7 +135,7 @@ export default function ModalImportarXML({ alimentos, onConfirmar, onCancelar }:
                 <li>Frações: ADIP, NDIP, proteína solúvel</li>
                 <li>Minerais: Ca, P, Mg, K, S, Na, Cl</li>
                 <li>Cinética: kd do amido, kd da fibra (quando disponível)</li>
-                <li>DFND 48h calculada do Kd + uNDF240 (silagens)</li>
+                <li>dFDN 48h calculada do Kd + uNDF240 (silagens)</li>
               </ul>
               <p className="mt-2">
                 Frações proteicas NASEM (A/B/C, kd_prot, etc.) e demais campos avançados
@@ -198,7 +198,7 @@ export default function ModalImportarXML({ alimentos, onConfirmar, onCancelar }:
             {parsed.alimento.lignin != null && <span>Lig {(parsed.alimento.lignin*100).toFixed(1)}%</span>}
             {parsed.alimento.ivndfd48 != null && (
               <span className="text-sky-700 font-semibold">
-                DFND 48h {parsed.alimento.ivndfd48.toFixed(1)}%
+                dFDN 48h {parsed.alimento.ivndfd48.toFixed(1)}%
               </span>
             )}
           </div>

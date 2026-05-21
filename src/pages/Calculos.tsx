@@ -194,7 +194,7 @@ Fator Temporal = 1 − (0,212 + P × 0,136) × e^(−0,053 × DEL)
 {`# 1) NDF (fibra) digestível — escolha do método no painel do animal:
 #    (a) Lignina (default — bate com NASEM Software oficial):
 #        Fd_dcNDF_base = 0,75 × (NDF − Lg) × (1 − (Lg/NDF)^0,667) / NDF
-#    (b) DFND 48h: Fd_dcNDF_base = (12 + 0,61 × DFND48) / 100
+#    (b) dFDN 48h: Fd_dcNDF_base = (12 + 0,61 × dFDN48) / 100
 #    Ajuste pela dieta (Eq. 20-115):
 #    Dt_dcNDF = Dt_dcNDF_Base − 1,1×(DMI/BW − 0,035)
 #                             − 0,59×(St_frac − 0,26)
@@ -220,15 +220,15 @@ Fator Temporal = 1 − (0,212 + P × 0,136) × e^(−0,053 × DEL)
               NASEM Software oficial — validado em 4 cenários com diferença ≤ 0,1% no leite potencial pela energia.
             </p>
             <p>
-              Se você escolher <strong>DFND 48h em todos</strong>, nosso motor usa os valores publicados na
+              Se você escolher <strong>dFDN 48h em todos</strong>, nosso motor usa os valores publicados na
               Tabela 19-1 NASEM (47-86% conforme o alimento). O NASEM Software oficial, mesmo configurado para
-              "usar DFND 48h", aplica valores padrão (48,3% para forragens / 65% para concentrados) a menos que
+              "usar dFDN 48h", aplica valores padrão (48,3% para forragens / 65% para concentrados) a menos que
               você digite os valores manualmente. Isso explica por que os números podem divergir.
             </p>
             <p>
               <strong>Resumo prático</strong>: para bater exato com o NASEM Software → use <em>Lignina</em>.
-              Para ter cálculo mais informativo usando dados reais → use <em>DFND 48h</em>. Para forragens da
-              sua fazenda com laudo → use <em>DFND 48h só forragens</em>.
+              Para ter cálculo mais informativo usando dados reais → use <em>dFDN 48h</em>. Para forragens da
+              sua fazenda com laudo → use <em>dFDN 48h só forragens</em>.
             </p>
           </div>
         </div>
@@ -425,7 +425,7 @@ Du_idMiTP = Du_idMiCP × 0,824                             [kg/d]        (Eq. 20
           <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 mt-2 text-xs text-gray-600">
             <strong>Ajuste da digestibilidade da fibra:</strong> a digestibilidade do FDN cai quando a vaca come
             muito (DMI/BW alto) ou quando a dieta tem muito amido — porque a passagem ruminal acelera e o pH cai.
-            A DFND 48h (digestibilidade <em>in vitro</em> da fibra em 48 horas, que vem nos laudos de análise de
+            A dFDN 48h (digestibilidade <em>in vitro</em> da fibra em 48 horas, que vem nos laudos de análise de
             forragem) é o melhor preditor quando você tem o valor medido da sua silagem ou feno.
           </div>
         </div>
@@ -645,16 +645,16 @@ An_MPavailMilk = An_MPIn − mp_mantenca − Gest_MPuse`}
               e concentrados.
             </p>
             <p>
-              <strong>Modo DFND 48h</strong>: aqui há uma diferença metodológica que vale entender. O nosso motor
+              <strong>Modo dFDN 48h</strong>: aqui há uma diferença metodológica que vale entender. O nosso motor
               usa os valores reais publicados na Tabela 19-1 (47-86% conforme o alimento). O NASEM Software oficial,
-              mesmo configurado para usar DFND 48h, aplica valores padrão fixos
+              mesmo configurado para usar dFDN 48h, aplica valores padrão fixos
               (<strong>48,3%</strong> para forragens / <strong>65%</strong> para concentrados) a menos que você digite
-              os valores manualmente. Por isso, ao escolher <em>DFND 48h</em>, os números do nosso motor podem
+              os valores manualmente. Por isso, ao escolher <em>dFDN 48h</em>, os números do nosso motor podem
               divergir do NASEM Software — mas são mais informativos.
             </p>
             <p>
-              <strong>Modo DFND 48h só forragens</strong>: recomendado quando você tem o laudo de análise das suas
-              forragens (silagem, feno) — basta cadastrar a DFND 48h medida pelo laboratório.
+              <strong>Modo dFDN 48h só forragens</strong>: recomendado quando você tem o laudo de análise das suas
+              forragens (silagem, feno) — basta cadastrar a dFDN 48h medida pelo laboratório.
             </p>
           </div>
         </div>

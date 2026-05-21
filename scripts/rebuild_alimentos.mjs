@@ -34,10 +34,16 @@ const ALIASES = {
   'distillers solubles modified wet': 'distillers grains and solubles modified wet',
 };
 
-// Mapeamento nome normalizado → registro NASEM
+// Mapeamento nome normalizado → registro NASEM (parser PDF)
 const lookupNasem = new Map();
 for (const r of Object.values(nasem)) {
   if (r.nome_nasem) lookupNasem.set(normalizar(r.nome_nasem), r);
+}
+
+// Mapeamento nome normalizado → registro CSV (fallback quando PDF não tem o alimento)
+const lookupExtraByName = new Map();
+for (const r of Object.values(extra)) {
+  if (r.name) lookupExtraByName.set(normalizar(r.name), r);
 }
 
 // Mapeamento NASEM key → JSON key + tipo de conversão
@@ -101,16 +107,34 @@ const novo = atual.map(a => {
   const chaveOriginal = normalizar(a.fonte_nasem);
   const chave = ALIASES[chaveOriginal] || chaveOriginal;
   let nasemRec = lookupNasem.get(chave);
-  // Fuzzy fallback: match parcial (uma chave contém a outra)
-  if (!nasemRec) {
+  // Fuzzy fallback: match parcial (uma chave contém a outra). Só permitido
+  // quando AMBAS as chaves têm 2+ palavras — evita matches espúrios como
+  // 'sugar' batendo com 'sugarcane bagasse hay' ou 'urea' com 'ureagrass'.
+  if (!nasemRec && chave.includes(' ')) {
     for (const [k, v] of lookupNasem.entries()) {
+      if (!k.includes(' ')) continue;
       if (k.includes(chave) || chave.includes(k)) { nasemRec = v; break; }
     }
   }
+
+  // Fallback CSV-only: alimento existe no CSV oficial (extra) mas não no PDF parser.
+  // Acontece para entradas do CSV que não estão impressas na Tabela 19-1 do PDF
+  // (ex: AAs protegidos, núcleos de bezerro, leites líquidos, certas misturas
+  //  gramínea-leguminosa, açúcar/glycerol).
+  let extraByName = null;
   if (!nasemRec) {
-    semMatch++;
-    semMatchNomes.push(a.nome + ' [fonte_nasem: ' + a.fonte_nasem + ']');
-    return a;
+    extraByName = lookupExtraByName.get(chave);
+    if (!extraByName && chave.includes(' ')) {
+      for (const [k, v] of lookupExtraByName.entries()) {
+        if (!k.includes(' ')) continue;
+        if (k.includes(chave) || chave.includes(k)) { extraByName = v; break; }
+      }
+    }
+    if (!extraByName) {
+      semMatch++;
+      semMatchNomes.push(a.nome + ' [fonte_nasem: ' + a.fonte_nasem + ']');
+      return a;
+    }
   }
   comMatch++;
 
@@ -125,10 +149,13 @@ const novo = atual.map(a => {
     reescrito[k] = null;
   }
 
-  // Substitui pelos valores NASEM convertidos (PDF)
-  for (const [nasemKey, jsonKey, tipo] of MAPEAMENTO) {
-    if (nasemRec[nasemKey] !== undefined && nasemRec[nasemKey] !== null) {
-      reescrito[jsonKey] = converte(nasemRec[nasemKey], tipo);
+  // Substitui pelos valores NASEM convertidos (PDF). Pulado quando não há
+  // nasemRec (alimento CSV-only) — todos os campos virão do bloco CSV abaixo.
+  if (nasemRec) {
+    for (const [nasemKey, jsonKey, tipo] of MAPEAMENTO) {
+      if (nasemRec[nasemKey] !== undefined && nasemRec[nasemKey] !== null) {
+        reescrito[jsonKey] = converte(nasemRec[nasemKey], tipo);
+      }
     }
   }
 
@@ -150,7 +177,11 @@ const novo = atual.map(a => {
   // O CSV oficial do nasem_dairy é fonte computável (mais confiável que parser
   // do PDF). Quando ambos têm valor, CSV vence. Resolve bugs como Silagem de
   // Milho Maduro amido=5% (CSV: 35.5%) e similares.
-  const extraRec = nasemRec.nrc_id ? extra[nasemRec.nrc_id] : null;
+  //
+  // Para alimentos CSV-only (sem nasemRec do PDF), usa o fallback localizado
+  // por nome (extraByName) — assim o pipeline popula 100% dos campos a partir
+  // do CSV oficial.
+  const extraRec = (nasemRec && nasemRec.nrc_id) ? extra[nasemRec.nrc_id] : extraByName;
   if (extraRec) {
     // Composição básica (% MS → fração 0-1)
     if (extraRec.dm     !== undefined) reescrito.ms     = parseFloat((extraRec.dm / 100).toFixed(6));
@@ -196,9 +227,15 @@ const novo = atual.map(a => {
   }
 
   // ── Campos DERIVADOS (DEPOIS da sobrescrita CSV) ─────────────────────────
-  // PDR e PNDR a partir de RUP da Tabela 19-1 (RUP % CP = % PB que escapa do rúmen)
-  if (nasemRec.rup !== null && nasemRec.rup !== undefined && reescrito.pb !== null) {
-    reescrito.pndr = parseFloat((reescrito.pb * nasemRec.rup / 100).toFixed(6));
+  // PDR e PNDR a partir de Fd_RUP_base do CSV oficial NASEM (fonte preferencial).
+  // Fallback para o parser PDF (nasemRec.rup) só se CSV não tiver o campo.
+  // Esses valores são INFORMATIVOS (UI/relatórios). O motor recalcula RUP/RDP
+  // dinamicamente via Eq. 6-1 em calculos.ts.
+  const rupSource = (extraRec && extraRec.rup_base !== undefined && extraRec.rup_base !== null)
+    ? extraRec.rup_base
+    : (nasemRec ? nasemRec.rup : null);
+  if (rupSource !== null && rupSource !== undefined && reescrito.pb !== null) {
+    reescrito.pndr = parseFloat((reescrito.pb * rupSource / 100).toFixed(6));
     reescrito.pdr  = parseFloat((reescrito.pb - reescrito.pndr).toFixed(6));
   }
 
