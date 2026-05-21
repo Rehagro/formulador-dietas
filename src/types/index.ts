@@ -74,6 +74,21 @@ export interface Alimento {
   fonte_nasem?: string | null;    // Nome original NASEM (rastreabilidade)
   alimento_base?: string | null;  // Nome PT-BR do alimento clonado como base (rastreabilidade)
   origem_laudo?: LaudoMetadata | null;  // Metadata se importado de XML de laboratório
+  origem_racao?: OrigemRacao | null;    // Metadata se este alimento foi criado pelo Formulador de Ração
+}
+
+/** Ingrediente que compõe uma ração (mistura de concentrados). */
+export interface IngredienteRacao {
+  alimento_nome: string;   // nome do alimento (deve existir no banco)
+  kg_d: number;            // kg/dia que vaca consumirá deste ingrediente na dieta
+}
+
+/** Metadata da ração salva como alimento composto. */
+export interface OrigemRacao {
+  data_criacao: string;    // ISO YYYY-MM-DD
+  fazenda?: string;        // nome da fazenda (opcional, para PDF)
+  capacidade_misturador_kg: number;
+  receita: IngredienteRacao[];   // ingredientes originais com kg/d
 }
 
 /** Metadata de laudo de análise (importado via XML — schema CVAS/Dairy One/3R Lab) */

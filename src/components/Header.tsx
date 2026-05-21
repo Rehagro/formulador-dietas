@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom';
-import { FlaskConical, Beef, BookOpen, Calculator, LogOut } from 'lucide-react';
+import { FlaskConical, Beef, BookOpen, Calculator, LogOut, Wheat } from 'lucide-react';
 import { useDieta } from '../context/DietaContext';
 
 export default function Header() {
@@ -30,7 +30,11 @@ export default function Header() {
         <nav className="flex gap-1">
           <NavLink to="/" end className={linkClass}>
             <FlaskConical size={15} />
-            Formulador
+            Dieta
+          </NavLink>
+          <NavLink to="/racao" className={linkClass}>
+            <Wheat size={15} />
+            Formulador Ração
           </NavLink>
           <NavLink to="/alimentos" className={linkClass}>
             <Beef size={15} />

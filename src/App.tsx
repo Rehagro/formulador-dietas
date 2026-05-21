@@ -2,8 +2,10 @@ import { useEffect, useState } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import { supabase } from './lib/supabase';
 import { DietaProvider } from './context/DietaContext';
+import { RacaoProvider } from './context/RacaoContext';
 import Header from './components/Header';
 import Formulador from './pages/Formulador';
+import FormuladorRacao from './pages/FormuladorRacao';
 import Alimentos from './pages/Alimentos';
 import Dietas from './pages/Dietas';
 import Calculos from './pages/Calculos';
@@ -56,11 +58,12 @@ export default function App() {
           path="/"
           element={
             autenticado
-              ? <DietaProvider><Layout /></DietaProvider>
+              ? <DietaProvider><RacaoProvider><Layout /></RacaoProvider></DietaProvider>
               : <Navigate to="/login" replace />
           }
         >
           <Route index element={<Formulador />} />
+          <Route path="racao" element={<FormuladorRacao />} />
           <Route path="alimentos" element={<Alimentos />} />
           <Route path="dietas" element={<Dietas />} />
           <Route path="calculos" element={<Calculos />} />

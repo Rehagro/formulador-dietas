@@ -1,0 +1,191 @@
+import { useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { ArrowLeft, Plus, Save, FileDown, Wheat } from 'lucide-react';
+import { useRacao } from '../context/RacaoContext';
+import { useDieta } from '../context/DietaContext';
+import { calcularRacao } from '../utils/calculosRacao';
+import { exportarPDFRacao } from '../utils/exportarPDFRacao';
+import TabelaIngredientesRacao from '../components/racao/TabelaIngredientesRacao';
+import PainelMineraisRacao from '../components/racao/PainelMineraisRacao';
+import ModalAdicionarIngrediente from '../components/racao/ModalAdicionarIngrediente';
+import ModalSalvarRacao from '../components/racao/ModalSalvarRacao';
+
+export default function FormuladorRacao() {
+  const { racao, atualizar, limpar } = useRacao();
+  const { alimentos } = useDieta();
+  const [modalAdd, setModalAdd] = useState(false);
+  const [modalSalvar, setModalSalvar] = useState(false);
+
+  // Estado vazio — nenhuma ração em construção
+  if (!racao || racao.ingredientes.length === 0) {
+    return (
+      <div className="max-w-[1600px] mx-auto px-4 py-6">
+        <div className="bg-white rounded-xl border border-gray-200 p-8 text-center">
+          <Wheat size={48} className="mx-auto text-amber-400 mb-3" />
+          <h2 className="text-lg font-bold text-gray-800 mb-2">Formulador de Ração</h2>
+          <p className="text-sm text-gray-600 mb-4">
+            Use esta tela para montar uma mistura de concentrados a partir dos
+            ingredientes de uma dieta. O sistema calcula a proporção e quanto
+            pesar de cada um para a capacidade do seu misturador.
+          </p>
+          <p className="text-sm text-gray-500 mb-6">
+            Para começar, vá na aba <strong>Dieta</strong>, selecione os
+            ingredientes que vão na mistura e clique em <strong>Formulador
+            de Ração</strong>.
+          </p>
+          <Link
+            to="/"
+            className="inline-flex items-center gap-2 bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-emerald-700"
+          >
+            <ArrowLeft size={15} /> Ir para Dieta
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  const resultado = useMemo(
+    () => calcularRacao(racao.ingredientes, alimentos, racao.capacidade_misturador_kg),
+    [racao.ingredientes, racao.capacidade_misturador_kg, alimentos],
+  );
+
+  return (
+    <div className="max-w-[1600px] mx-auto px-4 py-4 space-y-3">
+      {/* Topo: meta dados + ações */}
+      <div className="bg-white border border-gray-200 rounded-xl p-3">
+        <div className="flex items-center gap-3 flex-wrap">
+          <Wheat size={20} className="text-amber-500" />
+          <h1 className="text-base font-bold text-gray-800">Formulador de Ração</h1>
+          {racao.editando_nome && (
+            <span className="text-xs text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded">
+              Editando: {racao.editando_nome}
+            </span>
+          )}
+          <Link
+            to="/"
+            className="ml-auto flex items-center gap-1.5 text-xs text-gray-600 hover:text-gray-800"
+            onClick={() => { /* mantém racao para voltar */ }}
+          >
+            <ArrowLeft size={14} /> Voltar para Dieta
+          </Link>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-3">
+          <label className="text-xs">
+            <span className="text-gray-600">Fazenda (opcional)</span>
+            <input
+              type="text"
+              value={racao.fazenda ?? ''}
+              onChange={e => atualizar({ fazenda: e.target.value })}
+              placeholder="ex: Fazenda Boa Esperança"
+              className="mt-0.5 w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
+            />
+          </label>
+          <label className="text-xs">
+            <span className="text-gray-600">Nome da Ração (opcional, preenchido ao salvar)</span>
+            <input
+              type="text"
+              value={racao.nome ?? ''}
+              onChange={e => atualizar({ nome: e.target.value })}
+              placeholder="ex: Ração Lactação Alta"
+              className="mt-0.5 w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
+            />
+          </label>
+          <label className="text-xs">
+            <span className="text-gray-600 font-medium">Capacidade do misturador (kg)</span>
+            <input
+              type="number"
+              min="1"
+              step="10"
+              value={racao.capacidade_misturador_kg}
+              onChange={e => atualizar({ capacidade_misturador_kg: Number(e.target.value) || 0 })}
+              className="mt-0.5 w-full border border-amber-300 rounded-lg px-2 py-1.5 text-sm font-bold tabular-nums focus:outline-none focus:ring-2 focus:ring-amber-400"
+            />
+          </label>
+        </div>
+      </div>
+
+      {/* Tabela ingredientes */}
+      <TabelaIngredientesRacao
+        racao={racao}
+        resultado={resultado}
+        onChangeIngredientes={ings => atualizar({ ingredientes: ings })}
+      />
+
+      <div className="flex justify-between flex-wrap gap-2">
+        <button
+          onClick={() => setModalAdd(true)}
+          className="flex items-center gap-1.5 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 px-3 py-1.5 rounded-lg text-sm font-medium"
+        >
+          <Plus size={14} /> Adicionar ingrediente
+        </button>
+
+        {/* Cards resumo */}
+        <div className="flex gap-2 flex-wrap">
+          <div className="bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-1.5">
+            <div className="text-[10px] text-emerald-700 uppercase font-bold">R$/kg da mistura</div>
+            <div className="text-base font-bold text-emerald-900 tabular-nums">R$ {resultado.custo_por_kg.toFixed(3)}</div>
+          </div>
+          <div className="bg-blue-50 border border-blue-200 rounded-lg px-3 py-1.5">
+            <div className="text-[10px] text-blue-700 uppercase font-bold">R$ total da batida</div>
+            <div className="text-base font-bold text-blue-900 tabular-nums">R$ {resultado.custo_total.toFixed(2)}</div>
+          </div>
+          <div className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-1.5">
+            <div className="text-[10px] text-gray-600 uppercase font-bold">Consumo total / animal</div>
+            <div className="text-base font-bold text-gray-800 tabular-nums">{resultado.consumo_total_kg_d.toFixed(2)} kg/d</div>
+          </div>
+        </div>
+      </div>
+
+      {/* Minerais expansível */}
+      <PainelMineraisRacao composicao={resultado.composicao} />
+
+      {/* Ações finais */}
+      <div className="flex justify-end gap-2 pt-2">
+        <button
+          onClick={() => { limpar(); }}
+          className="text-sm text-gray-500 hover:text-gray-700 px-3 py-1.5"
+        >
+          Limpar
+        </button>
+        <button
+          onClick={() => exportarPDFRacao(resultado, {
+            nome: racao.nome || 'Ração',
+            fazenda: racao.fazenda,
+          })}
+          disabled={resultado.ingredientes.length === 0}
+          className="flex items-center gap-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-2 rounded-lg text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          <FileDown size={14} /> Exportar PDF
+        </button>
+        <button
+          onClick={() => setModalSalvar(true)}
+          disabled={resultado.ingredientes.length === 0 || resultado.kg_batida_total <= 0}
+          className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2 rounded-lg text-sm font-medium disabled:bg-gray-300 disabled:cursor-not-allowed"
+        >
+          <Save size={14} /> Salvar na biblioteca
+        </button>
+      </div>
+
+      {modalAdd && (
+        <ModalAdicionarIngrediente
+          alimentos={alimentos}
+          jaAdicionados={racao.ingredientes.map(i => i.alimento_nome)}
+          onAdd={ing => {
+            atualizar({ ingredientes: [...racao.ingredientes, ing] });
+            setModalAdd(false);
+          }}
+          onCancel={() => setModalAdd(false)}
+        />
+      )}
+
+      {modalSalvar && (
+        <ModalSalvarRacao
+          racao={racao}
+          resultado={resultado}
+          onClose={() => setModalSalvar(false)}
+        />
+      )}
+    </div>
+  );
+}

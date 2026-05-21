@@ -1,7 +1,9 @@
 import { useState, type ReactNode } from 'react';
-import { X, ChevronDown, ChevronUp, Lock, Copy, FileText, Beaker } from 'lucide-react';
+import { X, ChevronDown, ChevronUp, Lock, Copy, FileText, Beaker, Wheat, Edit } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import type { Alimento } from '../../types';
 import { fmtLock, origemAlimento, TIPO_LABEL } from './utils';
+import { useRacao } from '../../context/RacaoContext';
 
 interface Props {
   alimento: Alimento;
@@ -49,10 +51,19 @@ const pct = (v: number | null | undefined): string =>
   v === null || v === undefined ? '—' : (v * 100).toFixed(2);
 
 export default function ModalVisualizacaoAlimento({ alimento, onUsarComoBase, onFechar }: Props) {
+  const navigate = useNavigate();
+  const { iniciarEdicao } = useRacao();
   const origem = origemAlimento(alimento);
   const badge = origem === 'nasem'
     ? <span className="bg-blue-100 text-blue-700 text-[10px] font-bold px-2 py-0.5 rounded-full">NASEM 2021</span>
     : <span className="bg-green-100 text-green-700 text-[10px] font-bold px-2 py-0.5 rounded-full">Customizado</span>;
+
+  const reabrirNoFormulador = () => {
+    if (!alimento.origem_racao) return;
+    iniciarEdicao(alimento.nome, alimento.origem_racao);
+    onFechar();
+    navigate('/racao');
+  };
 
   return (
     <div className="fixed inset-0 bg-black/50 z-[60] flex items-start justify-center overflow-y-auto py-8">
@@ -64,6 +75,11 @@ export default function ModalVisualizacaoAlimento({ alimento, onUsarComoBase, on
             {alimento.origem_laudo && (
               <span className="bg-sky-100 text-sky-700 text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
                 <FileText size={10} /> Laudo
+              </span>
+            )}
+            {alimento.origem_racao && (
+              <span className="bg-amber-100 text-amber-700 text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
+                <Wheat size={10} /> Ração
               </span>
             )}
           </div>
@@ -93,6 +109,53 @@ export default function ModalVisualizacaoAlimento({ alimento, onUsarComoBase, on
                 Campos calculados: {Object.entries(alimento.origem_laudo.campos_calculados).map(([k, v]) => `${k} (${v})`).join('; ')}
               </div>
             )}
+          </div>
+        )}
+
+        {/* Banner de receita da ração */}
+        {alimento.origem_racao && (
+          <div className="px-5 py-3 bg-amber-50 border-b border-amber-100 text-xs">
+            <div className="flex items-center justify-between gap-2 mb-2">
+              <div className="font-semibold text-amber-800 flex items-center gap-1.5">
+                <Wheat size={13} /> Receita original da ração
+              </div>
+              <button
+                onClick={reabrirNoFormulador}
+                className="flex items-center gap-1 text-[11px] font-medium bg-amber-100 hover:bg-amber-200 text-amber-800 px-2 py-1 rounded"
+              >
+                <Edit size={11} /> Editar no Formulador
+              </button>
+            </div>
+            <div className="text-gray-700 grid grid-cols-2 gap-x-4 gap-y-0.5 mb-2">
+              <div>Capacidade do misturador: <strong>{alimento.origem_racao.capacidade_misturador_kg} kg</strong></div>
+              <div>Criada em: <strong>{alimento.origem_racao.data_criacao.split('-').reverse().join('/')}</strong></div>
+              {alimento.origem_racao.fazenda && (
+                <div className="col-span-2">Fazenda: <strong>{alimento.origem_racao.fazenda}</strong></div>
+              )}
+            </div>
+            <div className="bg-white border border-amber-100 rounded overflow-hidden">
+              <table className="w-full text-[11px]">
+                <thead className="bg-amber-50 text-amber-800">
+                  <tr>
+                    <th className="text-left px-2 py-1 font-semibold">Ingrediente</th>
+                    <th className="text-right px-2 py-1 font-semibold">kg/d consumo</th>
+                    <th className="text-right px-2 py-1 font-semibold">% mistura</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(() => {
+                    const total = alimento.origem_racao.receita.reduce((s, r) => s + r.kg_d, 0);
+                    return alimento.origem_racao.receita.map(r => (
+                      <tr key={r.alimento_nome} className="border-t border-amber-50">
+                        <td className="px-2 py-1 text-gray-800">{r.alimento_nome}</td>
+                        <td className="px-2 py-1 text-right tabular-nums">{r.kg_d.toFixed(2)}</td>
+                        <td className="px-2 py-1 text-right tabular-nums">{total > 0 ? (r.kg_d / total * 100).toFixed(1) : '—'}%</td>
+                      </tr>
+                    ));
+                  })()}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
 

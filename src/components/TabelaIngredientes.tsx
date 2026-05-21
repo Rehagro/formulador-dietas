@@ -1,8 +1,10 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { X, ChevronDown, Plus, GripVertical, Trash2 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { X, ChevronDown, Plus, GripVertical, Trash2, Wheat } from 'lucide-react';
 import type { SlotIngrediente, Alimento } from '../types';
 import { calcularNelAlimento } from '../utils/calculos';
+import { useRacao } from '../context/RacaoContext';
 
 interface Props {
   slots: SlotIngrediente[];
@@ -133,15 +135,60 @@ export default function TabelaIngredientes({ slots, alimentos, totalKgMS, onSlot
   const [units, setUnits] = useState<Record<string, 'kg' | 'g'>>({});
   const [dragIdx, setDragIdx] = useState<number | null>(null);
   const [overIdx, setOverIdx] = useState<number | null>(null);
+  const [selecionados, setSelecionados] = useState<Set<string>>(new Set());
+
+  const navigate = useNavigate();
+  const { iniciarComIngredientes } = useRacao();
+
+  // Slots elegíveis: têm alimento e kgMN > 0
+  const slotsElegiveis = slots.filter(s => s.alimentoNome && s.kgMN > 0);
+  const numSelecionados = slotsElegiveis.filter(s => selecionados.has(s.id)).length;
+
+  const toggleSelecionado = (slotId: string) => {
+    setSelecionados(prev => {
+      const novo = new Set(prev);
+      if (novo.has(slotId)) novo.delete(slotId); else novo.add(slotId);
+      return novo;
+    });
+  };
+
+  const irParaFormuladorRacao = () => {
+    const ingredientes = slotsElegiveis
+      .filter(s => selecionados.has(s.id))
+      .map(s => ({ alimento_nome: s.alimentoNome!, kg_d: s.kgMN }));
+    if (ingredientes.length === 0) return;
+    iniciarComIngredientes(ingredientes);
+    navigate('/racao');
+  };
 
   return (
     <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+      {/* Toolbar de seleção — visível quando há slots elegíveis */}
+      {slotsElegiveis.length > 0 && (
+        <div className="flex items-center justify-between gap-2 px-3 py-2 bg-amber-50/40 border-b border-amber-100">
+          <div className="text-xs text-amber-800">
+            {numSelecionados > 0
+              ? <span><strong>{numSelecionados}</strong> ingrediente{numSelecionados !== 1 ? 's' : ''} selecionado{numSelecionados !== 1 ? 's' : ''} para a ração</span>
+              : <span className="text-gray-500">Marque os ingredientes que vão na <strong>mesma mistura/ração</strong> da fazenda</span>}
+          </div>
+          <button
+            onClick={irParaFormuladorRacao}
+            disabled={numSelecionados === 0}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-amber-500 hover:bg-amber-600 text-white rounded-lg disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed transition-colors"
+            title={numSelecionados === 0 ? 'Selecione ao menos 1 ingrediente' : 'Abrir Formulador de Ração com os selecionados'}
+          >
+            <Wheat size={13} /> Formulador de Ração ({numSelecionados})
+          </button>
+        </div>
+      )}
+
       <div className="overflow-x-auto">
         <table className="w-full text-xs">
           <thead className="bg-gray-50 border-b border-gray-200">
             <tr>
               <th className="w-6 px-1" />
               <th className="w-8 px-2 py-2.5" />
+              <th className="w-8 px-2 py-2.5 text-center" title="Selecionar para a ração">🥣</th>
               <th className="text-left px-3 py-2.5 font-semibold text-gray-500 min-w-[220px]">Alimento</th>
               <th className="text-right px-2 py-2.5 font-semibold text-gray-500">kg MN</th>
               <th className="text-right px-2 py-2.5 font-semibold text-gray-500">kg MS</th>
@@ -189,6 +236,16 @@ export default function TabelaIngredientes({ slots, alimentos, totalKgMS, onSlot
                     >
                       <Trash2 size={12} />
                     </button>
+                  </td>
+                  <td className="px-2 py-1.5 text-center">
+                    <input
+                      type="checkbox"
+                      checked={selecionados.has(slot.id)}
+                      disabled={!alimento || slot.kgMN <= 0}
+                      onChange={() => toggleSelecionado(slot.id)}
+                      className="w-3.5 h-3.5 accent-amber-500 cursor-pointer disabled:cursor-not-allowed disabled:opacity-30"
+                      title={!alimento || slot.kgMN <= 0 ? 'Preencha o alimento e quantidade para incluir na ração' : 'Incluir na ração'}
+                    />
                   </td>
                   <td className="px-2 py-1">
                     <AlimentoSelect
@@ -256,7 +313,7 @@ export default function TabelaIngredientes({ slots, alimentos, totalKgMS, onSlot
           <tfoot className="bg-gray-100 border-t-2 border-gray-300 font-semibold">
             <tr>
               <td />
-              <td colSpan={2} className="px-3 py-2 text-gray-700">TOTAL</td>
+              <td colSpan={3} className="px-3 py-2 text-gray-700">TOTAL</td>
               <td className="px-2 py-2 text-right tabular-nums text-gray-800">
                 {slots.reduce((s, sl) => s + sl.kgMN, 0).toFixed(2)}
               </td>
