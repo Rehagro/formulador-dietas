@@ -26,6 +26,9 @@ export interface IngredienteCalculado {
 
 export interface ResultadoRacao {
   ingredientes: IngredienteCalculado[];
+  /** Nomes de ingredientes que estavam na receita mas não existem mais no banco
+   *  (ex: alimento deletado depois de a ração ter sido salva). UI deve avisar. */
+  ingredientes_faltantes: string[];
   /** kg/d consumo total — quanto vaca come dessa ração no total por dia. */
   consumo_total_kg_d: number;
   /** kg total da batida (= capacidade do misturador). */
@@ -98,20 +101,27 @@ export function calcularRacao(
   alimentos: Alimento[],
   capacidade: number,
 ): ResultadoRacao {
-  // Resolve cada ingrediente (lookup do alimento + kg_d)
+  // Resolve cada ingrediente (lookup do alimento + kg_d). Coleta os que
+  // não foram encontrados no banco para a UI avisar.
+  const faltantes: string[] = [];
   const resolvidos = ingredientes
     .map(ing => {
       const a = alimentos.find(x => x.nome === ing.alimento_nome);
-      return a ? { alimento: a, kg_d: ing.kg_d } : null;
+      if (!a) {
+        faltantes.push(ing.alimento_nome);
+        return null;
+      }
+      return { alimento: a, kg_d: ing.kg_d };
     })
     .filter((x): x is { alimento: Alimento; kg_d: number } => x !== null && x.kg_d > 0);
 
   const consumo_total = resolvidos.reduce((s, r) => s + r.kg_d, 0);
 
-  // Sem ingrediente válido → resultado vazio
+  // Sem ingrediente válido → resultado vazio (mas ainda reporta faltantes)
   if (consumo_total <= 0 || capacidade <= 0) {
     return {
       ingredientes: [],
+      ingredientes_faltantes: faltantes,
       consumo_total_kg_d: 0,
       kg_batida_total: capacidade,
       custo_total: 0,
@@ -155,6 +165,7 @@ export function calcularRacao(
 
   return {
     ingredientes: ingredientesCalc,
+    ingredientes_faltantes: faltantes,
     consumo_total_kg_d: consumo_total,
     kg_batida_total: capacidade,
     custo_total,

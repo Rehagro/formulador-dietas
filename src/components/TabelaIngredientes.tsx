@@ -188,7 +188,9 @@ export default function TabelaIngredientes({ slots, alimentos, totalKgMS, onSlot
             <tr>
               <th className="w-6 px-1" />
               <th className="w-8 px-2 py-2.5" />
-              <th className="w-8 px-2 py-2.5 text-center" title="Selecionar para a ração">🥣</th>
+              <th className="w-8 px-2 py-2.5 text-center" title="Selecionar para a ração">
+                <Wheat size={13} className="inline-block text-amber-600" />
+              </th>
               <th className="text-left px-3 py-2.5 font-semibold text-gray-500 min-w-[220px]">Alimento</th>
               <th className="text-right px-2 py-2.5 font-semibold text-gray-500">kg MN</th>
               <th className="text-right px-2 py-2.5 font-semibold text-gray-500">kg MS</th>
@@ -237,7 +239,14 @@ export default function TabelaIngredientes({ slots, alimentos, totalKgMS, onSlot
                       <Trash2 size={12} />
                     </button>
                   </td>
-                  <td className="px-2 py-1.5 text-center">
+                  {/* F3: célula do checkbox não participa do drag — mouseDown
+                       não dispara dragstart no <tr>, e o td não é draggable. */}
+                  <td
+                    className="px-2 py-1.5 text-center"
+                    draggable={false}
+                    onMouseDown={e => e.stopPropagation()}
+                    onDragStart={e => { e.preventDefault(); e.stopPropagation(); }}
+                  >
                     <input
                       type="checkbox"
                       checked={selecionados.has(slot.id)}

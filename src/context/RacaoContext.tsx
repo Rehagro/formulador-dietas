@@ -1,13 +1,14 @@
-import { createContext, useContext, useState, type ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
 import type { IngredienteRacao, OrigemRacao } from '../types';
 
 /**
- * Estado leve para passar a "ração em construção" entre rotas (Dieta → Formulador
- * Ração) ou para reabrir uma ração salva da biblioteca de alimentos no Formulador.
+ * Estado para passar a "ração em construção" entre rotas (Dieta → Formulador
+ * Ração) e para reabrir uma ração salva da biblioteca no Formulador.
  *
- * Não persiste em Supabase nem localStorage — é volátil, só serve para o handoff
- * de navegação. A ração só é persistida quando o aluno clica "Salvar na biblioteca"
- * (e aí vira um Alimento via DietaContext.adicionarAlimento).
+ * Persiste em `sessionStorage` apenas — sobrevive a F5/refresh enquanto a
+ * aba estiver aberta, mas não vaza entre sessões/usuários. NÃO persiste em
+ * `localStorage` nem Supabase. A ração só vira Alimento quando o aluno clica
+ * "Salvar na biblioteca" (via DietaContext.adicionarAlimento).
  */
 export interface RacaoEmConstrucao {
   nome?: string;
@@ -33,8 +34,33 @@ interface RacaoContextType {
 
 const RacaoContext = createContext<RacaoContextType | null>(null);
 
+const SS_KEY = 'racao-em-construcao';
+
+function carregarDoSession(): RacaoEmConstrucao | null {
+  try {
+    const raw = sessionStorage.getItem(SS_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as RacaoEmConstrucao;
+    if (!parsed || typeof parsed.capacidade_misturador_kg !== 'number') return null;
+    if (!Array.isArray(parsed.ingredientes)) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
 export function RacaoProvider({ children }: { children: ReactNode }) {
-  const [racao, setRacao] = useState<RacaoEmConstrucao | null>(null);
+  const [racao, setRacao] = useState<RacaoEmConstrucao | null>(() => carregarDoSession());
+
+  // Persiste em sessionStorage a cada mudança (sobrevive F5, não vaza entre sessões).
+  useEffect(() => {
+    try {
+      if (racao) sessionStorage.setItem(SS_KEY, JSON.stringify(racao));
+      else sessionStorage.removeItem(SS_KEY);
+    } catch {
+      /* sessionStorage indisponível (modo privado etc) — ignora */
+    }
+  }, [racao]);
 
   const iniciarComIngredientes = (ingredientes: IngredienteRacao[]) => {
     setRacao({

@@ -1,6 +1,6 @@
-import { useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { ArrowLeft, Plus, Save, FileDown, Wheat } from 'lucide-react';
+import { useMemo, useState, useEffect } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { ArrowLeft, Plus, Save, FileDown, Wheat, CheckCircle2, AlertTriangle } from 'lucide-react';
 import { useRacao } from '../context/RacaoContext';
 import { useDieta } from '../context/DietaContext';
 import { calcularRacao } from '../utils/calculosRacao';
@@ -13,11 +13,25 @@ import ModalSalvarRacao from '../components/racao/ModalSalvarRacao';
 export default function FormuladorRacao() {
   const { racao, atualizar, limpar } = useRacao();
   const { alimentos } = useDieta();
+  const navigate = useNavigate();
   const [modalAdd, setModalAdd] = useState(false);
   const [modalSalvar, setModalSalvar] = useState(false);
+  const [toastSucesso, setToastSucesso] = useState<string | null>(null);
 
-  // Estado vazio — nenhuma ração em construção
-  if (!racao || racao.ingredientes.length === 0) {
+  // F2: após mostrar toast de sucesso, navega para a biblioteca de alimentos
+  useEffect(() => {
+    if (!toastSucesso) return;
+    const t = setTimeout(() => {
+      setToastSucesso(null);
+      navigate('/alimentos');
+    }, 1500);
+    return () => clearTimeout(t);
+  }, [toastSucesso, navigate]);
+
+  // F1: welcome só quando NÃO há ração nenhuma em construção.
+  // Se há ração mas sem ingredientes (ex: aluno removeu todos em modo edição),
+  // mantém a tela cheia com aviso para adicionar.
+  if (!racao) {
     return (
       <div className="max-w-[1600px] mx-auto px-4 py-6">
         <div className="bg-white rounded-xl border border-gray-200 p-8 text-center">
@@ -49,8 +63,28 @@ export default function FormuladorRacao() {
     [racao.ingredientes, racao.capacidade_misturador_kg, alimentos],
   );
 
+  const semIngredientes = racao.ingredientes.length === 0;
+
+  // F5: confirm antes de limpar uma ração com conteúdo (evita perda acidental)
+  const limparComConfirm = () => {
+    if (semIngredientes || confirm('Limpar a ração em construção? As alterações não salvas serão perdidas.')) {
+      limpar();
+    }
+  };
+
   return (
     <div className="max-w-[1600px] mx-auto px-4 py-4 space-y-3">
+      {/* Toast de sucesso ao salvar */}
+      {toastSucesso && (
+        <div className="fixed top-20 right-6 z-[100] bg-emerald-600 text-white rounded-lg shadow-xl px-4 py-3 flex items-center gap-2 animate-in fade-in slide-in-from-top-2">
+          <CheckCircle2 size={18} />
+          <div className="text-sm">
+            <strong>{toastSucesso}</strong> salva na biblioteca.
+            <div className="text-xs opacity-80">Redirecionando…</div>
+          </div>
+        </div>
+      )}
+
       {/* Topo: meta dados + ações */}
       <div className="bg-white border border-gray-200 rounded-xl p-3">
         <div className="flex items-center gap-3 flex-wrap">
@@ -64,7 +98,6 @@ export default function FormuladorRacao() {
           <Link
             to="/"
             className="ml-auto flex items-center gap-1.5 text-xs text-gray-600 hover:text-gray-800"
-            onClick={() => { /* mantém racao para voltar */ }}
           >
             <ArrowLeft size={14} /> Voltar para Dieta
           </Link>
@@ -105,6 +138,38 @@ export default function FormuladorRacao() {
         </div>
       </div>
 
+      {/* F7: aviso quando ingredientes da receita sumiram do banco */}
+      {resultado.ingredientes_faltantes.length > 0 && (
+        <div className="bg-orange-50 border border-orange-200 rounded-lg p-3 flex items-start gap-2">
+          <AlertTriangle size={16} className="text-orange-600 flex-shrink-0 mt-0.5" />
+          <div className="text-xs text-orange-900">
+            <strong>Ingredientes não encontrados no banco:</strong>{' '}
+            {resultado.ingredientes_faltantes.join(', ')}.
+            <div className="text-orange-800 mt-1">
+              Esses alimentos foram removidos da biblioteca depois que a ração foi salva.
+              Os cálculos abaixo ignoram essas entradas. Adicione-os de volta na aba
+              Alimentos ou remova-os da receita para que a ração reflita a realidade.
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* F1: estado intermediário — ração existe mas está vazia */}
+      {semIngredientes && (
+        <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 flex items-start gap-2">
+          <AlertTriangle size={16} className="text-amber-600 flex-shrink-0 mt-0.5" />
+          <div className="text-xs text-amber-900">
+            <strong>Adicione pelo menos 1 ingrediente</strong> para continuar.
+            {racao.editando_nome && (
+              <div className="text-amber-800 mt-1">
+                Você está editando a ração <em>{racao.editando_nome}</em>. Se quiser
+                descartar a edição, clique em <strong>Limpar</strong>.
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Tabela ingredientes */}
       <TabelaIngredientesRacao
         racao={racao}
@@ -143,7 +208,7 @@ export default function FormuladorRacao() {
       {/* Ações finais */}
       <div className="flex justify-end gap-2 pt-2">
         <button
-          onClick={() => { limpar(); }}
+          onClick={limparComConfirm}
           className="text-sm text-gray-500 hover:text-gray-700 px-3 py-1.5"
         >
           Limpar
@@ -184,6 +249,11 @@ export default function FormuladorRacao() {
           racao={racao}
           resultado={resultado}
           onClose={() => setModalSalvar(false)}
+          onSaved={(nome) => {
+            setModalSalvar(false);
+            setToastSucesso(nome);
+            // limpar e navigate são tratados pelo useEffect do toast
+          }}
         />
       )}
     </div>

@@ -8,9 +8,12 @@ interface Props {
   racao: RacaoEmConstrucao;
   resultado: ResultadoRacao;
   onClose: () => void;
+  /** Chamado após salvar com sucesso. Recebe o nome da ração salva.
+   *  O caller é responsável por chamar limpar()/navegar/mostrar toast. */
+  onSaved?: (nome: string) => void;
 }
 
-export default function ModalSalvarRacao({ racao, resultado, onClose }: Props) {
+export default function ModalSalvarRacao({ racao, resultado, onClose, onSaved }: Props) {
   const { alimentos, adicionarAlimento, editarAlimento } = useDieta();
   const { limpar } = useRacao();
   const editando = !!racao.editando_nome;
@@ -47,8 +50,15 @@ export default function ModalSalvarRacao({ racao, resultado, onClose }: Props) {
       } else {
         await adicionarAlimento(alimento);
       }
-      limpar();
-      onClose();
+      const nomeSalvo = alimento.nome;
+      if (onSaved) {
+        // Caller exibe feedback e decide quando limpar/navegar.
+        onSaved(nomeSalvo);
+        limpar();
+      } else {
+        limpar();
+        onClose();
+      }
     } catch (e) {
       setErro((e as Error).message || 'Erro ao salvar.');
     } finally {
