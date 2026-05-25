@@ -713,7 +713,37 @@ export function calcularResultados(
   // Trg_NEmilk_Milk (Eq. 3-14b): 9,29×Fat% + 5,85×TP% + 3,95×Lact% / 100.
   // Nosso `animal.proteina` é CP%; converte para TP via × 0,95 (Mlk_NP_CP NASEM
   // 2021 — milk.py:142). Antes era 0,94 — diff descoberta na auditoria.
-  const nelMantenca       = 0.10 * Math.pow(animal.peso, 0.75);                // Eq. 3-13
+  const nelMantenca_base  = 0.10 * Math.pow(animal.peso, 0.75);                // Eq. 3-13
+
+  // NEm de atividade (NASEM 2021 Eq. 20-274 a 20-276) — só ativa em pastejo.
+  // Em confinamento, caminhada à ordenha é desprezível e zera todas as parcelas.
+  //
+  //   An_NEm_Act_Parlor = 0.00035 × (Env_DistParlor_m / 1000) × Env_TripsParlor × An_BW
+  //                       (energy_requirement.py:195)
+  //   An_NEm_Act_Topo   = 0.0067  × (Env_Topo_m       / 1000) × An_BW
+  //                       (energy_requirement.py:240)
+  //
+  // Conversões UX → NASEM:
+  //   Env_DistParlor_m = dist_pasto_ordenha_km × 1000
+  //   Env_TripsParlor  = 2 × n_ordenhas_dia  (ida + volta por ordenha)
+  //   Env_Topo_m       = mapping categórico Mild=0 / Moderate=100 / Steep=300 m/d
+  //
+  // Pasture grazing energy (An_NEm_Act_Graze) requer fração de pasto na dieta —
+  // como nosso motor não classifica alimentos como "pastagem", essa parcela
+  // fica em 0 por enquanto. Subestima ligeiramente em pastejo extensivo.
+  let nelMantenca_parlor = 0;
+  let nelMantenca_topo   = 0;
+  if (animal.pastejo) {
+    const dist_m = (animal.dist_pasto_ordenha_km ?? 0) * 1000;
+    const trips  = 2 * (animal.n_ordenhas_dia ?? 2);
+    nelMantenca_parlor = 0.00035 * (dist_m / 1000) * trips * animal.peso;
+
+    const TOPO_M_PER_DAY = { Mild: 0, Moderate: 100, Steep: 300 } as const;
+    const topo_m = TOPO_M_PER_DAY[animal.topografia ?? 'Mild'];
+    nelMantenca_topo = 0.0067 * (topo_m / 1000) * animal.peso;
+  }
+  const nelMantenca_atividade = nelMantenca_parlor + nelMantenca_topo;
+  const nelMantenca       = nelMantenca_base + nelMantenca_atividade;
   const Km_ME_NE          = 0.66;
   const Kl_ME_NE          = 0.66;
   const An_MEmUse         = nelMantenca / Km_ME_NE;
@@ -847,6 +877,10 @@ export function calcularResultados(
       Ur_N_g,
       // Parte 4 — mantença, ganho, gestação
       nelMantenca,
+      nelMantenca_base,
+      nelMantenca_parlor,
+      nelMantenca_topo,
+      nelMantenca_atividade,
       An_MEmUse, An_MEgain,
       Frm_NEgain, Rsrv_NEgain,
       Frm_NPgain_g:  Frm_NPgain * 1000,

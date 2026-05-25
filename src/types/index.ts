@@ -131,6 +131,12 @@ export interface AnimalLactacao {
   //   'iv_forage' = Eq. 20-111 (IVNDFD48) só forragens; lignina nos concentrados
   //   'iv_all'    = Eq. 20-111 (IVNDFD48) para todos os alimentos
   ndf_method?: 'lignin' | 'iv_forage' | 'iv_all';
+  // Pastejo (NASEM 2021 Eq. 20-274 a 20-276 — NEm de caminhada parlor + topografia)
+  // Quando ausente / pastejo=false, motor assume confinamento (NEm caminhada = 0).
+  pastejo?: boolean;
+  dist_pasto_ordenha_km?: number;            // km, ida única até a ordenha
+  n_ordenhas_dia?: number;                   // motor converte: trips = 2 × n_ordenhas
+  topografia?: 'Mild' | 'Moderate' | 'Steep';// mapping motor: 0 / 100 / 300 m/d de subida
 }
 
 export interface SlotIngrediente {
