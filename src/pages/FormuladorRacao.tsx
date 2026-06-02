@@ -1,5 +1,5 @@
 import { useMemo, useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { ArrowLeft, Plus, Save, FileDown, Wheat, CheckCircle2, AlertTriangle } from 'lucide-react';
 import { useRacao } from '../context/RacaoContext';
 import { useDieta } from '../context/DietaContext';
@@ -13,20 +13,26 @@ import ModalSalvarRacao from '../components/racao/ModalSalvarRacao';
 export default function FormuladorRacao() {
   const { racao, atualizar, limpar } = useRacao();
   const { alimentos } = useDieta();
-  const navigate = useNavigate();
   const [modalAdd, setModalAdd] = useState(false);
   const [modalSalvar, setModalSalvar] = useState(false);
   const [toastSucesso, setToastSucesso] = useState<string | null>(null);
 
-  // F2: após mostrar toast de sucesso, navega para a biblioteca de alimentos
+  // Toast de sucesso some sozinho. NÃO navega para fora — o usuário continua
+  // com a ração recém-salva na tela (pode salvar de novo e escolher sobrescrever).
   useEffect(() => {
     if (!toastSucesso) return;
-    const t = setTimeout(() => {
-      setToastSucesso(null);
-      navigate('/alimentos');
-    }, 1500);
+    const t = setTimeout(() => setToastSucesso(null), 2500);
     return () => clearTimeout(t);
-  }, [toastSucesso, navigate]);
+  }, [toastSucesso]);
+
+  // IMPORTANTE: todos os hooks ANTES de qualquer return condicional. Senão o
+  // React quebra ("rendered fewer hooks than expected") quando `racao` fica null
+  // — era a causa da tela branca ao salvar.
+  const resultado = useMemo(
+    () => calcularRacao(
+      racao?.ingredientes ?? [], alimentos, racao?.capacidade_misturador_kg ?? 0),
+    [racao?.ingredientes, racao?.capacidade_misturador_kg, alimentos],
+  );
 
   // F1: welcome só quando NÃO há ração nenhuma em construção.
   // Se há ração mas sem ingredientes (ex: aluno removeu todos em modo edição),
@@ -58,11 +64,6 @@ export default function FormuladorRacao() {
     );
   }
 
-  const resultado = useMemo(
-    () => calcularRacao(racao.ingredientes, alimentos, racao.capacidade_misturador_kg),
-    [racao.ingredientes, racao.capacidade_misturador_kg, alimentos],
-  );
-
   const semIngredientes = racao.ingredientes.length === 0;
 
   // F5: confirm antes de limpar uma ração com conteúdo (evita perda acidental)
@@ -80,7 +81,7 @@ export default function FormuladorRacao() {
           <CheckCircle2 size={18} />
           <div className="text-sm">
             <strong>{toastSucesso}</strong> salva na biblioteca.
-            <div className="text-xs opacity-80">Redirecionando…</div>
+            <div className="text-xs opacity-80">Você pode continuar editando.</div>
           </div>
         </div>
       )}
@@ -264,7 +265,9 @@ export default function FormuladorRacao() {
           onSaved={(nome) => {
             setModalSalvar(false);
             setToastSucesso(nome);
-            // limpar e navigate são tratados pelo useEffect do toast
+            // Mantém a ração na tela vinculada à salva (modo edição): permite
+            // continuar editando e, ao salvar de novo, escolher sobrescrever.
+            atualizar({ nome, editando_nome: nome });
           }}
         />
       )}

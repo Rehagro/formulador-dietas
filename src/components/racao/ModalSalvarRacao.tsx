@@ -54,9 +54,9 @@ export default function ModalSalvarRacao({ racao, resultado, onClose, onSaved }:
       }
       const nomeSalvo = alimento.nome;
       if (onSaved) {
-        // Caller exibe feedback e decide quando limpar/navegar.
+        // NÃO limpa: a ração continua na tela (modo edição) para o usuário
+        // seguir editando e poder sobrescrever depois. O caller exibe o toast.
         onSaved(nomeSalvo);
-        limpar();
       } else {
         limpar();
         onClose();
