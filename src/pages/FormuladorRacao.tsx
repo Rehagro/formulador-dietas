@@ -131,9 +131,21 @@ export default function FormuladorRacao() {
               min="1"
               step="10"
               value={racao.capacidade_misturador_kg}
-              onChange={e => atualizar({ capacidade_misturador_kg: Number(e.target.value) || 0 })}
+              onChange={e => atualizar({
+                capacidade_misturador_kg: Number(e.target.value) || 0,
+                // Reseta os kg editados manualmente → volta ao proporcional da dieta.
+                ingredientes: racao.ingredientes.map(ing => ({
+                  alimento_nome: ing.alimento_nome, kg_d: ing.kg_d,
+                })),
+              })}
               className="mt-0.5 w-full border border-amber-300 rounded-lg px-2 py-1.5 text-sm font-bold tabular-nums focus:outline-none focus:ring-2 focus:ring-amber-400"
             />
+            {Math.abs(resultado.kg_batida_total - racao.capacidade_misturador_kg) > 0.5 && (
+              <span className="text-[11px] text-amber-700 mt-0.5 block">
+                Total real da batida: <strong>{resultado.kg_batida_total.toFixed(1)} kg</strong>{' '}
+                (ajustado pelos kg editados). Mude a capacidade para voltar ao proporcional.
+              </span>
+            )}
           </label>
         </div>
       </div>

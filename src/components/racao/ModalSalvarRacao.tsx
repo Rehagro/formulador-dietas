@@ -18,26 +18,28 @@ export default function ModalSalvarRacao({ racao, resultado, onClose, onSaved }:
   const { limpar } = useRacao();
   const editando = !!racao.editando_nome;
 
+  // Quando a ração já foi salva (editando), o usuário escolhe sobrescrever a
+  // atual ou salvar como uma nova ração. Sem edição prévia, só existe "nova".
+  const [modo, setModo] = useState<'sobrescrever' | 'nova'>(editando ? 'sobrescrever' : 'nova');
   const [nome, setNome] = useState(
-    racao.editando_nome
-      ?? racao.nome
-      ?? `Ração ${new Date().toLocaleDateString('pt-BR')}`
+    racao.nome && !editando ? racao.nome : `Ração ${new Date().toLocaleDateString('pt-BR')}`
   );
   const [custo, setCusto] = useState(resultado.custo_por_kg.toFixed(3));
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
 
+  const nomeEfetivo = modo === 'sobrescrever' ? racao.editando_nome! : nome.trim();
   const conflito =
-    !editando
+    modo === 'nova'
     && alimentos.some(a => a.nome.toLowerCase() === nome.trim().toLowerCase());
 
   const salvar = async () => {
     setErro(null);
-    if (!nome.trim()) { setErro('Informe o nome da ração.'); return; }
-    if (conflito)    { setErro('Já existe um alimento com esse nome. Escolha outro.'); return; }
+    if (modo === 'nova' && !nome.trim()) { setErro('Informe o nome da ração.'); return; }
+    if (conflito) { setErro('Já existe um alimento com esse nome. Escolha outro.'); return; }
 
     const alimento = racaoParaAlimento(resultado, {
-      nome: nome.trim(),
+      nome: nomeEfetivo,
       fazenda: racao.fazenda,
       capacidade_misturador_kg: racao.capacidade_misturador_kg,
       custo_kg: Number(custo),
@@ -45,7 +47,7 @@ export default function ModalSalvarRacao({ racao, resultado, onClose, onSaved }:
 
     setSalvando(true);
     try {
-      if (editando && racao.editando_nome) {
+      if (modo === 'sobrescrever' && racao.editando_nome) {
         await editarAlimento(racao.editando_nome, alimento);
       } else {
         await adicionarAlimento(alimento);
@@ -74,7 +76,7 @@ export default function ModalSalvarRacao({ racao, resultado, onClose, onSaved }:
             <Wheat size={20} className="text-amber-500" />
             <div>
               <h2 className="font-bold text-gray-800 text-lg">
-                {editando ? 'Atualizar ração' : 'Salvar ração na biblioteca'}
+                {modo === 'sobrescrever' ? 'Atualizar ração' : 'Salvar ração na biblioteca'}
               </h2>
               <p className="text-sm text-gray-500 mt-0.5">
                 Vira um alimento Concentrado, disponível para usar em qualquer dieta.
@@ -87,18 +89,45 @@ export default function ModalSalvarRacao({ racao, resultado, onClose, onSaved }:
         </div>
 
         <div className="p-5 space-y-4">
+          {/* Escolha: sobrescrever a ração salva ou salvar como nova */}
+          {editando && (
+            <div className="space-y-1.5">
+              <span className="text-xs text-gray-600 font-medium block">Como salvar?</span>
+              <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+                <input
+                  type="radio"
+                  name="modo-salvar"
+                  checked={modo === 'sobrescrever'}
+                  onChange={() => setModo('sobrescrever')}
+                  className="accent-emerald-600"
+                />
+                Sobrescrever <strong>{racao.editando_nome}</strong>
+              </label>
+              <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+                <input
+                  type="radio"
+                  name="modo-salvar"
+                  checked={modo === 'nova'}
+                  onChange={() => setModo('nova')}
+                  className="accent-emerald-600"
+                />
+                Salvar como uma nova ração
+              </label>
+            </div>
+          )}
+
           <label className="block text-xs">
             <span className="text-gray-600 font-medium">Nome da ração</span>
             <input
               type="text"
-              value={nome}
+              value={modo === 'sobrescrever' ? (racao.editando_nome ?? '') : nome}
               onChange={e => setNome(e.target.value)}
-              disabled={editando}
+              disabled={modo === 'sobrescrever'}
               className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 disabled:bg-gray-50"
             />
-            {editando && (
+            {modo === 'sobrescrever' && (
               <span className="text-[11px] text-gray-400 mt-0.5 block">
-                Nome não pode ser alterado em edição. Para renomear, crie uma cópia.
+                Vai atualizar a ração existente. Escolha "nova ração" acima para criar uma cópia com outro nome.
               </span>
             )}
           </label>
@@ -157,10 +186,10 @@ export default function ModalSalvarRacao({ racao, resultado, onClose, onSaved }:
           </button>
           <button
             onClick={salvar}
-            disabled={salvando || !nome.trim() || conflito}
+            disabled={salvando || (modo === 'nova' && !nome.trim()) || conflito}
             className="flex items-center gap-1.5 px-4 py-2 text-sm text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg disabled:bg-gray-300"
           >
-            <Save size={14} /> {salvando ? 'Salvando...' : (editando ? 'Atualizar' : 'Salvar')}
+            <Save size={14} /> {salvando ? 'Salvando...' : (modo === 'sobrescrever' ? 'Atualizar' : 'Salvar')}
           </button>
         </div>
       </div>

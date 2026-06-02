@@ -63,9 +63,14 @@ export function RacaoProvider({ children }: { children: ReactNode }) {
   }, [racao]);
 
   const iniciarComIngredientes = (ingredientes: IngredienteRacao[]) => {
-    setRacao({
-      capacidade_misturador_kg: 1000,
-      ingredientes,
+    setRacao(prev => {
+      // Sem ração em construção → inicia nova.
+      if (!prev) return { capacidade_misturador_kg: 1000, ingredientes };
+      // Já existe ração → MESCLA os novos insumos (sem duplicar por nome),
+      // preservando o que já estava na tela (não apaga o trabalho do usuário).
+      const existentes = new Set(prev.ingredientes.map(i => i.alimento_nome));
+      const novos = ingredientes.filter(i => !existentes.has(i.alimento_nome));
+      return { ...prev, ingredientes: [...prev.ingredientes, ...novos] };
     });
   };
 

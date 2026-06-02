@@ -31,7 +31,8 @@ export interface ResultadoRacao {
   ingredientes_faltantes: string[];
   /** kg/d consumo total — quanto vaca come dessa ração no total por dia. */
   consumo_total_kg_d: number;
-  /** kg total da batida (= capacidade do misturador). */
+  /** kg total da batida = soma dos kg efetivos (capacidade nominal ou ajustada
+   *  pelos kg editados manualmente). Pode diferir da capacidade nominal. */
   kg_batida_total: number;
   /** R$ custo total da batida. */
   custo_total: number;
@@ -67,6 +68,8 @@ export interface Composicao {
   ca: number; p: number; mg: number; k: number; na: number; cl: number; s: number;
   // Microminerais
   cu: number; fe: number; mn_min: number; zn: number; co: number; se: number; i: number; mo: number;
+  // Vitaminas
+  vit_a: number; vit_d3: number; vit_e: number;
   // AAs
   met: number; lys: number;
   // Cinética amido
@@ -81,6 +84,7 @@ const CAMPOS_PONDERADOS: (keyof Composicao)[] = [
   'ivndfd48','de_base',
   'ca','p','mg','k','na','cl','s',
   'cu','fe','mn_min','zn','co','se','i','mo',
+  'vit_a','vit_d3','vit_e',
   'met','lys',
   'dc_st','dc_fa','npn_frac',
 ];
@@ -104,16 +108,15 @@ export function calcularRacao(
   // Resolve cada ingrediente (lookup do alimento + kg_d). Coleta os que
   // não foram encontrados no banco para a UI avisar.
   const faltantes: string[] = [];
-  const resolvidos = ingredientes
-    .map(ing => {
-      const a = alimentos.find(x => x.nome === ing.alimento_nome);
-      if (!a) {
-        faltantes.push(ing.alimento_nome);
-        return null;
-      }
-      return { alimento: a, kg_d: ing.kg_d };
-    })
-    .filter((x): x is { alimento: Alimento; kg_d: number } => x !== null && x.kg_d > 0);
+  const resolvidos = ingredientes.flatMap(ing => {
+    const a = alimentos.find(x => x.nome === ing.alimento_nome);
+    if (!a) {
+      faltantes.push(ing.alimento_nome);
+      return [];
+    }
+    if (ing.kg_d <= 0) return [];
+    return [{ alimento: a, kg_d: ing.kg_d, kg_batida_manual: ing.kg_batida }];
+  });
 
   const consumo_total = resolvidos.reduce((s, r) => s + r.kg_d, 0);
 
@@ -130,18 +133,29 @@ export function calcularRacao(
     };
   }
 
-  // Calcula proporção e kg batida por ingrediente
+  // kg da batida por ingrediente: usa o override manual (ex: arredondado) quando
+  // existir; senão deriva proporcionalmente da capacidade. O TOTAL da batida e as
+  // proporções (% e composição) seguem esses kg efetivos — por isso editar 1 kg
+  // muda o total e os %. Mudar a capacidade limpa os overrides (volta ao proporcional).
+  const efetivos = resolvidos.map(r => {
+    const kg_batida = (r.kg_batida_manual != null && r.kg_batida_manual > 0)
+      ? r.kg_batida_manual
+      : (r.kg_d / consumo_total) * capacidade;
+    return { ...r, kg_batida };
+  });
+  const total_batida = efetivos.reduce((s, e) => s + e.kg_batida, 0);
+
+  // Calcula proporção (pela batida) e custo por ingrediente
   let custo_total = 0;
-  const ingredientesCalc: IngredienteCalculado[] = resolvidos.map(r => {
-    const fracao = r.kg_d / consumo_total;
-    const kg_batida = fracao * capacidade;
-    const custo_batida = kg_batida * (r.alimento.custo ?? 0);
+  const ingredientesCalc: IngredienteCalculado[] = efetivos.map(e => {
+    const fracao = total_batida > 0 ? e.kg_batida / total_batida : 0;
+    const custo_batida = e.kg_batida * (e.alimento.custo ?? 0);
     custo_total += custo_batida;
     return {
-      alimento: r.alimento,
-      kg_d: r.kg_d,
+      alimento: e.alimento,
+      kg_d: e.kg_d,
       fracao,
-      kg_batida,
+      kg_batida: e.kg_batida,
       custo_batida,
       pct_custo: 0,  // preenchido depois
     };
@@ -167,9 +181,9 @@ export function calcularRacao(
     ingredientes: ingredientesCalc,
     ingredientes_faltantes: faltantes,
     consumo_total_kg_d: consumo_total,
-    kg_batida_total: capacidade,
+    kg_batida_total: total_batida,
     custo_total,
-    custo_por_kg: capacidade > 0 ? custo_total / capacidade : 0,
+    custo_por_kg: total_batida > 0 ? custo_total / total_batida : 0,
     composicao,
   };
 }
@@ -193,6 +207,7 @@ export function racaoParaAlimento(
     receita: resultado.ingredientes.map(ic => ({
       alimento_nome: ic.alimento.nome,
       kg_d: ic.kg_d,
+      kg_batida: ic.kg_batida,
     })),
   };
 
@@ -222,10 +237,11 @@ export function racaoParaAlimento(
     // AAs e cinética
     met: c.met, lys: c.lys,
     dc_st: c.dc_st, dc_fa: c.dc_fa, npn_frac: c.npn_frac,
+    // Vitaminas ponderadas (banco agora 100% alinhado com NASEM)
+    vit_a: c.vit_a, vit_d3: c.vit_d3, vit_e: c.vit_e,
     // Campos que não fazem sentido ponderar (deixar null)
     pdr: null, pndr: null, efdn: null, fdnf: null, nel: null,
     kd_amido: null,
-    vit_a: null, vit_d3: null, vit_e: null,
     biotina: null, monensina: null, cr: null, levedura: null,
     cp_digest: null, ndf_digest: null, fat_digest: null,
     lisina_pct: null, met_pct: null,

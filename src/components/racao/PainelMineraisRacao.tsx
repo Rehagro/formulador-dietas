@@ -24,7 +24,7 @@ export default function PainelMineraisRacao({ composicao }: Props) {
         className="w-full flex items-center justify-between px-4 py-2.5 bg-gray-50 hover:bg-gray-100 transition-colors text-left"
       >
         <span className="text-sm font-semibold text-gray-700">
-          🧂 Composição mineral da mistura (ponderada)
+          🧂 Composição mineral e vitamínica da mistura (ponderada)
         </span>
         {aberto ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
       </button>
@@ -44,6 +44,13 @@ export default function PainelMineraisRacao({ composicao }: Props) {
           <Item label="Co"  valor={mg(c.co, 3)} sufixo="mg/kg" />
           <Item label="Se"  valor={mg(c.se, 3)} sufixo="mg/kg" />
           <Item label="I"   valor={mg(c.i, 3)} sufixo="mg/kg" />
+          {/* Aminoácidos */}
+          <Item label="Met" valor={pct(c.met)} sufixo="% MS" />
+          <Item label="Lis" valor={pct(c.lys)} sufixo="% MS" />
+          {/* Vitaminas */}
+          <Item label="Vit A"  valor={mg(c.vit_a, 0)} sufixo="UI/kg" />
+          <Item label="Vit D3" valor={mg(c.vit_d3, 0)} sufixo="UI/kg" />
+          <Item label="Vit E"  valor={mg(c.vit_e, 1)} sufixo="UI/kg" />
         </div>
       )}
     </div>

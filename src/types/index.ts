@@ -81,6 +81,10 @@ export interface Alimento {
 export interface IngredienteRacao {
   alimento_nome: string;   // nome do alimento (deve existir no banco)
   kg_d: number;            // kg/dia que vaca consumirá deste ingrediente na dieta
+  /** Override manual do kg na batida (ex: arredondar 61,5 → 62). Quando ausente,
+   *  o kg é derivado proporcionalmente da capacidade. Resetado ao mudar a
+   *  capacidade do misturador (volta ao proporcional). */
+  kg_batida?: number;
 }
 
 /** Metadata da ração salva como alimento composto. */
