@@ -208,8 +208,12 @@ export default function ModalEdicaoAlimento({
       const ivndfd48Final = isLaudo && valoresLaudo?.ivndfd48 != null
         ? valoresLaudo.ivndfd48
         : (alimentoBase.ivndfd48 ?? null);
-      const persistido: Alimento = toStore({
-        ...form,
+      // IMPORTANTE: os campos travados vêm do alimentoBase JÁ em formato de
+      // armazenamento (frações 0-1 / valores crus). Eles são aplicados DEPOIS
+      // do toStore(form) para não sofrerem a divisão por 100 dos CAMPOS_FRACAO.
+      // (rup_digest ∈ CAMPOS_FRACAO; injetá-lo dentro do toStore zerava o campo.)
+      const persistido: Alimento = {
+        ...toStore(form),
         prot_a: alimentoBase.prot_a,
         prot_b: alimentoBase.prot_b,
         prot_c: alimentoBase.prot_c,
@@ -219,7 +223,7 @@ export default function ModalEdicaoAlimento({
         fonte_nasem: alimentoBase.fonte_nasem ?? null,
         alimento_base: isClone ? alimentoBase.nome : (form.alimento_base ?? null),
         origem_laudo: isLaudo ? metadataLaudo ?? null : (form.origem_laudo ?? null),
-      });
+      };
       await onSalvar(persistido, isClone ? alimentoBase.nome : (form.alimento_base ?? null));
     } finally {
       setSalvando(false);

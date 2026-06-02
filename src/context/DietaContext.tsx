@@ -9,6 +9,7 @@ import {
   signOut,
 } from '../lib/supabase';
 import { gerarId } from '../utils/storage';
+import { migrarRupDigest } from '../utils/migracoes';
 
 const ANIMAL_PADRAO: AnimalLactacao = {
   ecc: 3.0,
@@ -115,10 +116,21 @@ export function DietaProvider({ children }: { children: ReactNode }) {
         for (const a of customDB) customMap.set(a.nome, a);
         const customArr = Array.from(customMap.values());
 
-        // Mescla alimentos base + custom (custom sobrescreve base por nome)
+        // Migração: corrige rup_digest gravado errado (~100× menor) em alimentos
+        // custom antigos e repersiste os que mudaram. Idempotente.
         const base = alimentosBase as Alimento[];
-        const customNomes = new Set(customArr.map(a => a.nome));
-        const merged = [...base.filter(a => !customNomes.has(a.nome)), ...customArr]
+        const { corrigidos: customArrCorrigido, alterados } =
+          migrarRupDigest(customArr, base);
+        if (alterados.length > 0) {
+          Promise.all(alterados.map(a => saveAlimentoCustomSupabase(a)))
+            .then(() => console.info(
+              `[migração rup_digest] ${alterados.length} alimento(s) corrigido(s)`))
+            .catch(err => console.error('[migração rup_digest] falha ao repersistir:', err));
+        }
+
+        // Mescla alimentos base + custom (custom sobrescreve base por nome)
+        const customNomes = new Set(customArrCorrigido.map(a => a.nome));
+        const merged = [...base.filter(a => !customNomes.has(a.nome)), ...customArrCorrigido]
           .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
         setAlimentos(merged);
 
