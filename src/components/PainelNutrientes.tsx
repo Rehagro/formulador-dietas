@@ -1,0 +1,134 @@
+import { useState } from 'react';
+import { ChevronDown, ChevronRight } from 'lucide-react';
+import type { Referencia, ResultadoDieta } from '../types';
+import { getReferenciasLactacao, getStatus, statusColor, statusDot } from '../utils/referencias';
+import { formatarValor } from '../utils/calculos';
+
+interface Props {
+  resultado: ResultadoDieta;
+  leite: number;
+}
+
+function NutrienteRow({ chave, valor, refs }: {
+  chave: string; valor: number; refs: Record<string, Referencia>;
+}) {
+  const ref = refs[chave];
+  if (!ref) return null;
+  const status = getStatus(valor, ref);
+  const color = statusColor(status);
+  const dot = statusDot(status);
+  const valorFormatado = formatarValor(valor, ref.unidade);
+
+  // Faixa-recomendação (orientador pedagógico — mantida por pedido do usuário)
+  const refStr = ref.ref !== undefined
+    ? ref.ref
+    : ref.min !== undefined && ref.max !== undefined
+    ? `${formatarValor(ref.min, ref.unidade)} – ${formatarValor(ref.max, ref.unidade)}`
+    : ref.min !== undefined
+    ? `≥ ${formatarValor(ref.min, ref.unidade)}`
+    : ref.max !== undefined
+    ? `≤ ${formatarValor(ref.max, ref.unidade)}`
+    : '';
+
+  return (
+    <div className={`flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-md ${color}`}>
+      <span className="text-xs font-semibold">{dot} {ref.label}</span>
+      <div className="text-right whitespace-nowrap">
+        <span className="text-sm font-bold tabular-nums">{valorFormatado}</span>
+        {refStr && <span className="text-[11px] ml-2 opacity-60">{refStr}</span>}
+      </div>
+    </div>
+  );
+}
+
+function Grupo({ titulo, chaves, resultado, refs, defaultOpen = false }: {
+  titulo: string; chaves: string[]; resultado: ResultadoDieta;
+  refs: Record<string, Referencia>; defaultOpen?: boolean;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  const visiveis = chaves.filter(k => refs[k]);
+  if (visiveis.length === 0) return null;
+
+  const conta = (cats: string[]) => visiveis.filter(k =>
+    cats.includes(getStatus(resultado[k as keyof ResultadoDieta] as number, refs[k]))).length;
+  const alertas = conta(['critico_alto', 'critico_baixo']);
+  const avisos = conta(['alto', 'baixo']);
+
+  return (
+    <div className="border border-gray-200 rounded-lg overflow-hidden">
+      <button
+        onClick={() => setOpen(o => !o)}
+        className="w-full flex items-center justify-between px-3 py-2 bg-gray-50 hover:bg-gray-100 transition-colors text-left"
+      >
+        <span className="text-xs font-semibold text-gray-700">{titulo}</span>
+        <div className="flex items-center gap-1.5">
+          {alertas > 0 && (
+            <span className="bg-red-100 text-red-700 text-[10px] font-bold px-1.5 py-0.5 rounded-full">{alertas}🔴</span>
+          )}
+          {avisos > 0 && (
+            <span className="bg-amber-100 text-amber-700 text-[10px] font-bold px-1.5 py-0.5 rounded-full">{avisos}🟡</span>
+          )}
+          {open ? <ChevronDown size={14} className="text-gray-400" /> : <ChevronRight size={14} className="text-gray-400" />}
+        </div>
+      </button>
+      {open && (
+        <div className="p-2 flex flex-col gap-1">
+          {visiveis.map(k => (
+            <NutrienteRow
+              key={k}
+              chave={k}
+              valor={resultado[k as keyof ResultadoDieta] as number}
+              refs={refs}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// NEl e NDT removidos do painel (pedido do usuário — pouca informação).
+interface GrupoCfg { titulo: string; chaves: string[]; defaultOpen: boolean; }
+const ABAS: Record<'nutrientes' | 'minerais', GrupoCfg[]> = {
+  nutrientes: [
+    { titulo: '⚡ Energia & Carboidratos', chaves: ['cnf', 'amido', 'amido_deg'], defaultOpen: false },
+    { titulo: '🧬 Proteína', chaves: ['pb', 'pdr', 'pndr', 'met', 'lys'], defaultOpen: true },
+    { titulo: '🌾 Fibra', chaves: ['fdn', 'efdn', 'fdnf', 'fda'], defaultOpen: true },
+    { titulo: '🔬 Gordura', chaves: ['ee', 'ee_insat'], defaultOpen: false },
+  ],
+  minerais: [
+    { titulo: '🧂 Macrominerais', chaves: ['ca', 'p', 'mg', 'k', 's', 'na', 'cl'], defaultOpen: true },
+    { titulo: '💊 Microminerais', chaves: ['co', 'cu', 'mn_min', 'zn', 'se', 'i', 'fe'], defaultOpen: false },
+    { titulo: '🌟 Vitaminas & Aditivos', chaves: ['vit_a', 'vit_d3', 'vit_e', 'biotina', 'monensina', 'cr', 'levedura'], defaultOpen: false },
+  ],
+};
+
+export default function PainelNutrientes({ resultado, leite }: Props) {
+  const [aba, setAba] = useState<'nutrientes' | 'minerais'>('nutrientes');
+  const refs = getReferenciasLactacao(leite);
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden flex flex-col">
+      <div className="flex border-b border-gray-200">
+        {([['nutrientes', 'Nutrientes'], ['minerais', 'Minerais & Vitaminas']] as const).map(([id, label]) => (
+          <button
+            key={id}
+            onClick={() => setAba(id)}
+            className={`flex-1 px-3 py-2.5 text-xs font-semibold transition-colors ${
+              aba === id
+                ? 'text-green-700 border-b-2 border-green-600 bg-green-50/40'
+                : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+      <div className="p-2.5 flex flex-col gap-2">
+        {ABAS[aba].map(g => (
+          <Grupo key={g.titulo} titulo={g.titulo} chaves={g.chaves} resultado={resultado} refs={refs} defaultOpen={g.defaultOpen} />
+        ))}
+      </div>
+    </div>
+  );
+}

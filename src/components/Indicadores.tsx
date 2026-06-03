@@ -36,43 +36,26 @@ function IndicStatus({ chave, resultado }: { chave: string; resultado: Resultado
     : '—';
 
   return (
-    <div className={`border rounded-xl p-3 ${color}`}>
-      <div className="text-xs font-semibold mb-1.5">{dot} {ref.label}</div>
-      <div className="text-xl font-bold tabular-nums leading-tight">{valorStr}</div>
-      <div className="text-xs opacity-60 mt-1.5 leading-snug">{refStr}</div>
+    <div className={`border rounded-lg p-2 ${color}`}>
+      <div className="text-[11px] font-semibold mb-0.5 leading-tight">{dot} {ref.label}</div>
+      <div className="text-base font-bold tabular-nums leading-tight">{valorStr}</div>
+      <div className="text-[10px] opacity-60 mt-0.5 leading-snug">{refStr}</div>
     </div>
   );
 }
 
 export default function Indicadores({ resultado }: Props) {
-  const { kPf, kPc, kPl } = resultado;
-
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
-      <h2 className="text-sm font-bold text-gray-700 mb-3">📈 Indicadores</h2>
+    <div className="bg-white border border-gray-200 rounded-xl p-3 shadow-sm">
+      <h2 className="text-sm font-bold text-gray-700 mb-2">📈 Indicadores</h2>
 
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2 mb-3">
+      <div className="grid grid-cols-3 gap-2">
         <IndicStatus chave="fdnf_kg_pv"      resultado={resultado} />
         <IndicStatus chave="pct_forragem_ms" resultado={resultado} />
         <IndicStatus chave="fdn8_amido_deg"  resultado={resultado} />
         <IndicStatus chave="lis_met"         resultado={resultado} />
         <IndicStatus chave="ca_p"            resultado={resultado} />
         <IndicStatus chave="dcad"            resultado={resultado} />
-      </div>
-
-      <div className="border border-gray-200 rounded-xl p-3 bg-gray-50 w-fit">
-        <div className="text-xs text-gray-500 mb-1 font-medium">
-          Taxas de Passagem (NASEM 2021)
-        </div>
-        <div className="text-xs space-y-0.5 font-medium">
-          <div>kPf: <span className="font-bold tabular-nums">{(kPf * 100).toFixed(2)}%/h</span></div>
-          <div>kPc: <span className="font-bold tabular-nums">{(kPc * 100).toFixed(2)}%/h</span></div>
-          <div>kPl: <span className="font-bold tabular-nums">{(kPl * 100).toFixed(2)}%/h</span></div>
-        </div>
-        <div className="text-[10px] text-gray-500 mt-2 leading-snug max-w-[14rem]">
-          Valores fixos para vaca em lactação (Cap. 6 NASEM 2021). O NRC 2001 usava equação
-          dependente de % PV de forragem/concentrado — abandonada por excesso de ruído.
-        </div>
       </div>
     </div>
   );

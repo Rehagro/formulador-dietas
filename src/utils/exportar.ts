@@ -114,7 +114,7 @@ export async function exportarXLSX(dieta: Dieta, alimentos: Alimento[]): Promise
 
   const animal = dieta.animal;
   const dadosAnimal: [string, string | number, string, string | number][] = [
-    ['Peso', `${animal.peso} kg`,        'Paridade', animal.paridade === 0 ? 'Novilha' : 'Vaca adulta'],
+    ['Peso', `${animal.peso} kg`,        'Paridade', animal.paridade === 0 ? 'Primíparas' : 'Multíparas'],
     ['DEL', `${animal.del} dias`,        'ECC', animal.ecc],
     ['Leite', `${animal.leite} kg/d`,    'Preco Leite', `R$ ${animal.precoLeite.toFixed(2)}/L`],
     ['Gordura', `${animal.gordura}%`,    'Proteina', `${animal.proteina}%`],

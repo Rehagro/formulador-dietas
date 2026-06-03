@@ -2,7 +2,8 @@ import { useState, useMemo } from 'react';
 import { Save, Download, RefreshCw, FileText } from 'lucide-react';
 import { useDieta } from '../context/DietaContext';
 import PainelAnimal from '../components/PainelAnimal';
-import PainelResultados from '../components/PainelResultados';
+import ResumoDieta from '../components/ResumoDieta';
+import PainelNutrientes from '../components/PainelNutrientes';
 import TabelaIngredientes from '../components/TabelaIngredientes';
 import Indicadores from '../components/Indicadores';
 import { calcularResultados } from '../utils/calculos';
@@ -197,25 +198,26 @@ export default function Formulador() {
         </button>
       </div>
 
-      {/* Layout principal: 2 colunas — Animal + Resultados */}
-      <div className="grid grid-cols-1 lg:grid-cols-[300px_1fr] gap-4">
+      {/* Resumo no topo — CMS, leite potencial, custos e barra de CMS */}
+      <ResumoDieta resultado={resultado} leite={dieta.animal.leite} precoLeite={dieta.animal.precoLeite} />
+
+      {/* Layout principal: Animal | Ingredientes | Nutrientes lado a lado */}
+      <div className="grid grid-cols-1 xl:grid-cols-[280px_minmax(0,1.15fr)_minmax(0,1fr)] gap-4 items-start">
         <PainelAnimal animal={dieta.animal} onChange={setAnimal} />
-        <PainelResultados resultado={resultado} leite={dieta.animal.leite} precoLeite={dieta.animal.precoLeite} />
+        <TabelaIngredientes
+          slots={dieta.slots}
+          alimentos={alimentos}
+          totalKgMS={resultado.totalKgMS}
+          onSlotChange={setSlot}
+          onAdicionarSlot={adicionarSlot}
+          onReordenar={reordenarSlots}
+          onRemoverSlot={removerSlot}
+        />
+        <div className="flex flex-col gap-4">
+          <PainelNutrientes resultado={resultado} leite={dieta.animal.leite} />
+          <Indicadores resultado={resultado} />
+        </div>
       </div>
-
-      {/* Tabela de ingredientes */}
-      <TabelaIngredientes
-        slots={dieta.slots}
-        alimentos={alimentos}
-        totalKgMS={resultado.totalKgMS}
-        onSlotChange={setSlot}
-        onAdicionarSlot={adicionarSlot}
-        onReordenar={reordenarSlots}
-        onRemoverSlot={removerSlot}
-      />
-
-      {/* Indicadores */}
-      <Indicadores resultado={resultado} />
     </div>
   );
 }

@@ -117,7 +117,7 @@ export default function PainelAnimal({ animal, onChange }: Props) {
       <div className="mb-3">
         <label className="text-xs font-medium text-gray-500 block mb-1 flex items-center">
           Paridade
-          <CampoTooltip texto="Novilha = primeira lactação. Vaca adulta = segunda em diante. Impacta CMS e mantença." />
+          <CampoTooltip texto="Primíparas = primeira lactação. Multíparas = segunda em diante. Impacta CMS e mantença." />
         </label>
         <div className="flex gap-2">
           {([0, 1] as const).map(p => (
@@ -130,7 +130,7 @@ export default function PainelAnimal({ animal, onChange }: Props) {
                   : 'bg-white text-gray-600 border-gray-200 hover:border-green-400'
               }`}
             >
-              {p === 0 ? '🐮 Novilha' : '🐄 Vaca adulta'}
+              {p === 0 ? '🐮 Primíparas' : '🐄 Multíparas'}
             </button>
           ))}
         </div>
@@ -183,10 +183,10 @@ export default function PainelAnimal({ animal, onChange }: Props) {
           <Campo label="Peso maduro" hint="kg" value={peso_maduro} min={300} max={900} step={10}
             onChange={v => onChange({ ...animal, peso_maduro: v })}
             dica={"Peso adulto da vaca (Holstein ≈ 700 kg, Jersey ≈ 480 kg). " +
-                  "Impacta exigência de ganho em novilhas."} />
+                  "Impacta exigência de ganho em primíparas."} />
           <Campo label="Ganho peso" hint="kg/d" value={ganho_frame} min={0} max={1} step={0.05}
             onChange={v => onChange({ ...animal, ganho_frame_kg_dia: Math.max(0, v) })}
-            dica={"Vaca adulta no peso ideal: 0. Novilha crescendo: 0,1 a 0,3 kg/d. " +
+            dica={"Multíparas no peso ideal: 0. Primíparas crescendo: 0,1 a 0,3 kg/d. " +
                   "Reduz o leite potencial pela energia e proteína."} />
           <Campo label="Ganho ECC" hint="kg/d" value={ganho_reserva} min={-0.5} max={0.5} step={0.05}
             onChange={v => onChange({ ...animal, ganho_reserva_kg_dia: v })}

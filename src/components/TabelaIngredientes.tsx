@@ -3,7 +3,6 @@ import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { X, ChevronDown, Plus, GripVertical, Trash2, Wheat } from 'lucide-react';
 import type { SlotIngrediente, Alimento } from '../types';
-import { calcularNelAlimento } from '../utils/calculos';
 import { useRacao } from '../context/RacaoContext';
 
 interface Props {
@@ -230,20 +229,14 @@ export default function TabelaIngredientes({ slots, alimentos, totalKgMS, onSlot
         <table className="w-full text-xs">
           <thead className="bg-gray-50 border-b border-gray-200">
             <tr>
-              <th className="w-6 px-1" />
-              <th className="w-8 px-2 py-2.5" />
-              <th className="w-8 px-2 py-2.5 text-center" title="Selecionar para a ração">
+              <th className="w-5 px-0.5" />
+              <th className="w-6 px-1 py-2.5" />
+              <th className="w-7 px-1 py-2.5 text-center" title="Selecionar para a ração">
                 <Wheat size={13} className="inline-block text-amber-600" />
               </th>
-              <th className="text-left px-3 py-2.5 font-semibold text-gray-500 min-w-[220px]">Alimento</th>
+              <th className="text-left px-2 py-2.5 font-semibold text-gray-500 min-w-[140px]">Alimento</th>
               <th className="text-right px-2 py-2.5 font-semibold text-gray-500">kg MN</th>
               <th className="text-right px-2 py-2.5 font-semibold text-gray-500">kg MS</th>
-              <th className="text-right px-2 py-2.5 font-semibold text-gray-500">% MS dieta</th>
-              <th className="text-right px-2 py-2.5 font-semibold text-gray-500">MS %</th>
-              <th className="text-right px-2 py-2.5 font-semibold text-gray-500">NEl</th>
-              <th className="text-right px-2 py-2.5 font-semibold text-gray-500">PB %</th>
-              <th className="text-right px-2 py-2.5 font-semibold text-gray-500">FDN %</th>
-              <th className="text-right px-2 py-2.5 font-semibold text-gray-500">Amido %</th>
               <th className="text-right px-2 py-2.5 font-semibold text-gray-500">R$/kg</th>
             </tr>
           </thead>
@@ -251,7 +244,6 @@ export default function TabelaIngredientes({ slots, alimentos, totalKgMS, onSlot
             {slots.map((slot, idx) => {
               const alimento = slot.alimentoNome ? alimentos.find(a => a.nome === slot.alimentoNome) : null;
               const kgMS = alimento ? slot.kgMN * alimento.ms : 0;
-              const pctMS = totalKgMS > 0 && kgMS > 0 ? (kgMS / totalKgMS) * 100 : 0;
 
               const unit = units[slot.id] ?? 'kg';
 
@@ -268,10 +260,10 @@ export default function TabelaIngredientes({ slots, alimentos, totalKgMS, onSlot
                   onDragEnd={() => { setDragIdx(null); setOverIdx(null); }}
                   className={`transition-colors ${isDragging ? 'opacity-40 bg-green-50' : isOver ? 'bg-blue-50 border-t-2 border-blue-400' : 'hover:bg-gray-50'}`}
                 >
-                  <td className="px-1 py-1.5 text-gray-300 cursor-grab active:cursor-grabbing">
-                    <GripVertical size={14} />
+                  <td className="px-0.5 py-1.5 text-gray-300 cursor-grab active:cursor-grabbing">
+                    <GripVertical size={13} />
                   </td>
-                  <td className="px-2 py-1.5 text-center">
+                  <td className="px-1 py-1.5 text-center">
                     <button
                       onClick={() => onRemoverSlot(idx)}
                       className="p-1 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded transition-colors"
@@ -283,7 +275,7 @@ export default function TabelaIngredientes({ slots, alimentos, totalKgMS, onSlot
                   {/* F3: célula do checkbox não participa do drag — mouseDown
                        não dispara dragstart no <tr>, e o td não é draggable. */}
                   <td
-                    className="px-2 py-1.5 text-center"
+                    className="px-1 py-1.5 text-center"
                     draggable={false}
                     onMouseDown={e => e.stopPropagation()}
                     onDragStart={e => { e.preventDefault(); e.stopPropagation(); }}
@@ -297,26 +289,26 @@ export default function TabelaIngredientes({ slots, alimentos, totalKgMS, onSlot
                       title={!alimento || slot.kgMN <= 0 ? 'Preencha o alimento e quantidade para incluir na ração' : 'Incluir na ração'}
                     />
                   </td>
-                  <td className="px-2 py-1">
+                  <td className="px-1 py-1">
                     <AlimentoSelect
                       value={slot.alimentoNome}
                       alimentos={alimentos}
                       onChange={nome => onSlotChange(idx, { alimentoNome: nome, kgMN: nome ? slot.kgMN : 0, custoOverride: null })}
                     />
                   </td>
-                  <td className="px-2 py-1">
-                    <div className="flex items-center justify-end gap-1">
+                  <td className="px-1 py-1">
+                    <div className="flex items-center justify-end gap-0.5">
                       <EditableNum
                         value={unit === 'g' ? slot.kgMN * 1000 : slot.kgMN}
                         dec={unit === 'g' ? 1 : 3}
                         disabled={!alimento}
                         onCommit={v => onSlotChange(idx, { kgMN: unit === 'g' ? v / 1000 : v })}
-                        className="w-20 text-right border border-gray-200 rounded-lg px-1.5 py-1 focus:outline-none focus:ring-1 focus:ring-green-500 disabled:bg-gray-50 disabled:text-gray-300 tabular-nums font-semibold"
+                        className="w-14 text-right border border-gray-200 rounded-lg px-1.5 py-1 focus:outline-none focus:ring-1 focus:ring-green-500 disabled:bg-gray-50 disabled:text-gray-300 tabular-nums font-semibold"
                       />
                       <button
                         disabled={!alimento}
                         onClick={() => setUnits(u => ({ ...u, [slot.id]: unit === 'kg' ? 'g' : 'kg' }))}
-                        className={`text-[10px] font-bold px-1.5 py-0.5 rounded border transition-colors ${
+                        className={`text-[10px] font-bold px-1 py-0.5 rounded border transition-colors ${
                           !alimento
                             ? 'text-gray-300 border-gray-200 cursor-default'
                             : unit === 'g'
@@ -330,7 +322,7 @@ export default function TabelaIngredientes({ slots, alimentos, totalKgMS, onSlot
                     </div>
                   </td>
                   {/* kg MS editável — conta inversa via MS% do alimento (ponto 3) */}
-                  <td className="px-2 py-1">
+                  <td className="px-1 py-1">
                     <div className="flex justify-end">
                       <EditableNum
                         value={kgMS}
@@ -339,42 +331,30 @@ export default function TabelaIngredientes({ slots, alimentos, totalKgMS, onSlot
                         onCommit={v => {
                           if (alimento && alimento.ms > 0) onSlotChange(idx, { kgMN: v / alimento.ms });
                         }}
-                        className="w-20 text-right border border-gray-200 rounded-lg px-1.5 py-1 focus:outline-none focus:ring-1 focus:ring-green-500 disabled:bg-gray-50 disabled:text-gray-300 tabular-nums text-gray-700"
+                        className="w-14 text-right border border-gray-200 rounded-lg px-1.5 py-1 focus:outline-none focus:ring-1 focus:ring-green-500 disabled:bg-gray-50 disabled:text-gray-300 tabular-nums text-gray-700"
                       />
                     </div>
                   </td>
-                  <td className="px-2 py-1.5 text-right tabular-nums text-gray-700">
-                    {pctMS > 0 ? pctMS.toFixed(1) + '%' : '—'}
+                  {/* R$/kg editável — override só desta dieta (ponto 4) */}
+                  <td className="px-1 py-1">
+                    {alimento ? (
+                      <div className="flex justify-end">
+                        <EditableNum
+                          value={slot.custoOverride ?? alimento.custo ?? 0}
+                          dec={3}
+                          placeholder="0,000"
+                          onCommit={v => onSlotChange(idx, { custoOverride: v })}
+                          className={`w-14 text-right border rounded-lg px-1.5 py-1 focus:outline-none focus:ring-1 focus:ring-green-500 tabular-nums ${
+                            slot.custoOverride != null && slot.custoOverride !== alimento.custo
+                              ? 'border-amber-300 bg-amber-50 text-amber-800 font-semibold'
+                              : 'border-gray-200 text-gray-600'
+                          }`}
+                        />
+                      </div>
+                    ) : (
+                      <div className="text-right text-gray-300">—</div>
+                    )}
                   </td>
-                  {alimento ? (
-                    <>
-                      <td className="px-2 py-1.5 text-right tabular-nums text-gray-600">{(alimento.ms * 100).toFixed(1)}</td>
-                      <td className="px-2 py-1.5 text-right tabular-nums text-gray-600">{calcularNelAlimento(alimento).toFixed(3)}</td>
-                      <td className="px-2 py-1.5 text-right tabular-nums text-gray-600">{(alimento.pb * 100).toFixed(2)}</td>
-                      <td className="px-2 py-1.5 text-right tabular-nums text-gray-600">{alimento.fdn !== null ? (alimento.fdn * 100).toFixed(1) : '—'}</td>
-                      <td className="px-2 py-1.5 text-right tabular-nums text-gray-600">{alimento.amido !== null ? (alimento.amido * 100).toFixed(1) : '—'}</td>
-                      {/* R$/kg editável — override só desta dieta (ponto 4) */}
-                      <td className="px-2 py-1">
-                        <div className="flex justify-end">
-                          <EditableNum
-                            value={slot.custoOverride ?? alimento.custo ?? 0}
-                            dec={3}
-                            placeholder="0,000"
-                            onCommit={v => onSlotChange(idx, { custoOverride: v })}
-                            className={`w-20 text-right border rounded-lg px-1.5 py-1 focus:outline-none focus:ring-1 focus:ring-green-500 tabular-nums ${
-                              slot.custoOverride != null && slot.custoOverride !== alimento.custo
-                                ? 'border-amber-300 bg-amber-50 text-amber-800 font-semibold'
-                                : 'border-gray-200 text-gray-600'
-                            }`}
-                          />
-                        </div>
-                      </td>
-                    </>
-                  ) : (
-                    Array.from({ length: 6 }).map((_, i) => (
-                      <td key={i} className="px-2 py-1.5 text-right text-gray-300">—</td>
-                    ))
-                  )}
                 </tr>
               );
             })}
@@ -389,7 +369,7 @@ export default function TabelaIngredientes({ slots, alimentos, totalKgMS, onSlot
               <td className="px-2 py-2 text-right tabular-nums text-gray-800">
                 {totalKgMS.toFixed(2)}
               </td>
-              <td colSpan={7} />
+              <td />
             </tr>
           </tfoot>
         </table>

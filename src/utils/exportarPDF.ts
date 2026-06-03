@@ -88,7 +88,7 @@ export function exportarPDF(dieta: Dieta, alimentos: Alimento[]): void {
   const dadosA = [
     [`Peso: ${animal.peso} kg`,      `Leite: ${animal.leite} kg/d`,     `DEL: ${animal.del} dias`],
     [`Gordura: ${animal.gordura}%`,  `Proteina: ${animal.proteina}%`,   `Lactose: ${animal.lactose}%`],
-    [`ECC: ${animal.ecc}`,           `Paridade: ${animal.paridade === 0 ? 'Novilha' : 'Vaca adulta'}`, `Preco leite: R$ ${animal.precoLeite.toFixed(2)}/L`],
+    [`ECC: ${animal.ecc}`,           `Paridade: ${animal.paridade === 0 ? 'Primíparas' : 'Multíparas'}`, `Preco leite: R$ ${animal.precoLeite.toFixed(2)}/L`],
   ];
 
   doc.setFontSize(8.5);
