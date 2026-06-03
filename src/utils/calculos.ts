@@ -1,5 +1,9 @@
 import type { Alimento, AnimalLactacao, SlotIngrediente, ResultadoDieta } from '../types';
 
+/** MS (fração 0-1) efetivo do slot: usa o override por dieta quando existir,
+ *  senão o MS do alimento na biblioteca. (Ponto 4 — MS% editável) */
+const msEff = (slot: SlotIngrediente, a: Alimento): number => slot.msOverride ?? a.ms;
+
 // ─────────────────────────────────────────────────────────────────────────────
 // PARÂMETROS RUMINAIS — NASEM 2021 por categoria animal
 //
@@ -255,7 +259,7 @@ export function calcularResultados(
     if (!a) continue;
 
     const kgMN = slot.kgMN;
-    const kgMS = kgMN * a.ms;
+    const kgMS = kgMN * msEff(slot, a);
 
     totalKgMN += kgMN;
     totalKgMS += kgMS;
@@ -375,7 +379,7 @@ export function calcularResultados(
       kgMS_forragem += kgMS;
       // Dt_ForWet NASEM (nutrient_intakes.py:128-131): só conta forragem com
       // DM<71% E For>50%. Como a.tipo='F' implica For=100%, basta checar DM.
-      if (a.ms < 0.71) kgMS_ForWet += kgMS;
+      if (msEff(slot, a) < 0.71) kgMS_ForWet += kgMS;
     }
   }
 
@@ -573,7 +577,7 @@ export function calcularResultados(
       if (!slot.alimentoNome || slot.kgMN <= 0) continue;
       const a = alimentos.find(x => x.nome === slot.alimentoNome);
       if (!a || !a.fdn || a.fdn <= 0) continue;
-      const kgMS_slot = slot.kgMN * a.ms;
+      const kgMS_slot = slot.kgMN * msEff(slot, a);
       const Fd_dcNDF_base = calcularFdDcNDFBase(a, ndf_method);
       Dt_DigNDFIn_Base_kg += Fd_dcNDF_base * a.fdn * kgMS_slot;
     }
@@ -593,7 +597,7 @@ export function calcularResultados(
       if (!slot.alimentoNome || slot.kgMN <= 0) continue;
       const a = alimentos.find(x => x.nome === slot.alimentoNome);
       if (!a || !a.amido) continue;
-      const kgMS_slot = slot.kgMN * a.ms;
+      const kgMS_slot = slot.kgMN * msEff(slot, a);
       const dcSt = (a.dc_st ?? 92) / 100;     // fração; default 92% (sem dado)
       Dt_DigStIn_Base += dcSt * a.amido * kgMS_slot;
     }
@@ -609,7 +613,7 @@ export function calcularResultados(
       if (!slot.alimentoNome || slot.kgMN <= 0) continue;
       const a = alimentos.find(x => x.nome === slot.alimentoNome);
       if (!a) continue;
-      const kgMS_slot = slot.kgMN * a.ms;
+      const kgMS_slot = slot.kgMN * msEff(slot, a);
       const fa_frac   = a.fa ?? ((a.ee ?? 0) * 0.80);
       const kgFA_slot = fa_frac * kgMS_slot;
       if (kgFA_slot <= 0) continue;
@@ -641,7 +645,7 @@ export function calcularResultados(
       if (!slot.alimentoNome || slot.kgMN <= 0) continue;
       const a = alimentos.find(x => x.nome === slot.alimentoNome);
       if (!a) continue;
-      const kgMS_slot = slot.kgMN * a.ms;
+      const kgMS_slot = slot.kgMN * msEff(slot, a);
       const fa_frac   = a.fa ?? ((a.ee ?? 0) * 0.80);
       const isFASupp  = a.classificacao === 'Gordura/Óleo';
       const fHydr     = isFASupp ? 1.0 : (1 / 1.06);

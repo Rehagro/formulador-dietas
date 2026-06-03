@@ -19,7 +19,7 @@ export default function Formulador() {
   const [criandoNova, setCriandoNova] = useState(false);
   const [toastVisivel, setToastVisivel] = useState(false);
   const [toastMsg, setToastMsg] = useState('✅ Dieta salva com sucesso!');
-  const [promptCustos, setPromptCustos] = useState<Map<string, number> | null>(null);
+  const [promptEdits, setPromptEdits] = useState<Map<string, { custo?: number; ms?: number }> | null>(null);
 
   const resultado = useMemo(
     () => calcularResultados(dieta.slots, alimentos, dieta.animal),
@@ -38,29 +38,38 @@ export default function Formulador() {
       await salvarDieta(nomeDieta);
       showToast('✅ Dieta salva com sucesso!');
 
-      // Ponto 4 — R$/kg editado nesta dieta: oferece gravar também na biblioteca.
-      const overridePorNome = new Map<string, number>();
+      // R$/kg e MS% editados nesta dieta: oferece gravar também na biblioteca.
+      const edits = new Map<string, { custo?: number; ms?: number }>();
       for (const s of dieta.slots) {
-        if (s.custoOverride == null || !s.alimentoNome) continue;
+        if (!s.alimentoNome) continue;
         const a = alimentos.find(x => x.nome === s.alimentoNome);
-        if (a && s.custoOverride !== a.custo) overridePorNome.set(s.alimentoNome, s.custoOverride);
+        if (!a) continue;
+        const e: { custo?: number; ms?: number } = {};
+        if (s.custoOverride != null && s.custoOverride !== a.custo) e.custo = s.custoOverride;
+        if (s.msOverride != null && s.msOverride !== a.ms) e.ms = s.msOverride;
+        if (e.custo !== undefined || e.ms !== undefined) edits.set(s.alimentoNome, e);
       }
-      if (overridePorNome.size > 0) setPromptCustos(overridePorNome);
+      if (edits.size > 0) setPromptEdits(edits);
     } finally {
       setSalvando(false);
     }
   }
 
-  // Resposta do modal de preços editados (ponto 4)
-  async function aplicarCustosBiblioteca(salvar: boolean) {
-    const map = promptCustos;
-    setPromptCustos(null);
+  // Resposta do modal de edições (R$/kg e/ou MS%) por dieta
+  async function aplicarEdicoesBiblioteca(salvar: boolean) {
+    const map = promptEdits;
+    setPromptEdits(null);
     if (salvar && map) {
-      for (const [nome, custo] of map) {
+      for (const [nome, e] of map) {
         const a = alimentos.find(x => x.nome === nome);
-        if (a) await editarAlimento(nome, { ...a, custo });
+        if (!a) continue;
+        await editarAlimento(nome, {
+          ...a,
+          ...(e.custo !== undefined ? { custo: e.custo } : {}),
+          ...(e.ms !== undefined ? { ms: e.ms } : {}),
+        });
       }
-      showToast('💲 R$/kg atualizado na biblioteca.');
+      showToast('💾 Alimento(s) atualizado(s) na biblioteca.');
     }
   }
 
@@ -104,40 +113,44 @@ export default function Formulador() {
         </div>
       </div>
 
-      {/* Modal — salvar R$/kg editado na biblioteca (ponto 4) */}
-      {promptCustos && (
+      {/* Modal — salvar edições (R$/kg e/ou MS%) na biblioteca */}
+      {promptEdits && (
         <div className="fixed inset-0 bg-black/50 z-[70] flex items-center justify-center px-4">
           <div className="bg-white rounded-xl shadow-xl w-full max-w-md">
             <div className="p-5 border-b border-gray-100 flex items-center gap-2">
-              <span className="text-xl">💲</span>
-              <h2 className="font-bold text-gray-800 text-lg">Salvar preço na biblioteca?</h2>
+              <span className="text-xl">💾</span>
+              <h2 className="font-bold text-gray-800 text-lg">Salvar alterações na biblioteca?</h2>
             </div>
             <div className="p-5 space-y-3">
               <p className="text-sm text-gray-600">
-                Você ajustou o <strong>R$/kg</strong> de {promptCustos.size} alimento(s) nesta dieta:
+                Você ajustou <strong>{promptEdits.size} alimento(s)</strong> nesta dieta:
               </p>
               <ul className="text-sm bg-gray-50 border border-gray-100 rounded-lg p-3 space-y-1 max-h-48 overflow-y-auto">
-                {[...promptCustos.entries()].map(([nome, custo]) => (
+                {[...promptEdits.entries()].map(([nome, e]) => (
                   <li key={nome} className="flex justify-between gap-3">
                     <span className="text-gray-700 truncate">{nome}</span>
-                    <span className="font-semibold text-amber-700 tabular-nums whitespace-nowrap">R$ {custo.toFixed(3)}</span>
+                    <span className="font-semibold text-amber-700 tabular-nums whitespace-nowrap">
+                      {e.custo !== undefined && <>R$ {e.custo.toFixed(3)}</>}
+                      {e.custo !== undefined && e.ms !== undefined && ' · '}
+                      {e.ms !== undefined && <>MS {(e.ms * 100).toFixed(1)}%</>}
+                    </span>
                   </li>
                 ))}
               </ul>
               <p className="text-xs text-gray-500">
-                <strong>Salvar na biblioteca</strong> atualiza o preço para todas as dietas.{' '}
-                <strong>Só nesta dieta</strong> mantém o preço apenas aqui.
+                <strong>Salvar na biblioteca</strong> atualiza para todas as dietas.{' '}
+                <strong>Só nesta dieta</strong> mantém as alterações apenas aqui.
               </p>
             </div>
             <div className="flex justify-end gap-2 p-4 border-t border-gray-100">
               <button
-                onClick={() => aplicarCustosBiblioteca(false)}
+                onClick={() => aplicarEdicoesBiblioteca(false)}
                 className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg"
               >
                 Só nesta dieta
               </button>
               <button
-                onClick={() => aplicarCustosBiblioteca(true)}
+                onClick={() => aplicarEdicoesBiblioteca(true)}
                 className="px-4 py-2 text-sm text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg font-medium"
               >
                 Salvar na biblioteca
@@ -202,7 +215,7 @@ export default function Formulador() {
       <ResumoDieta resultado={resultado} leite={dieta.animal.leite} precoLeite={dieta.animal.precoLeite} />
 
       {/* Layout principal: Animal | Ingredientes | Nutrientes lado a lado */}
-      <div className="grid grid-cols-1 xl:grid-cols-[280px_minmax(0,1.15fr)_minmax(0,1fr)] gap-4 items-start">
+      <div className="grid grid-cols-1 xl:grid-cols-[270px_minmax(0,1.45fr)_minmax(0,0.9fr)] gap-4 items-start">
         <PainelAnimal animal={dieta.animal} onChange={setAnimal} />
         <TabelaIngredientes
           slots={dieta.slots}

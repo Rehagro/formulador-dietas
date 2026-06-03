@@ -237,13 +237,16 @@ export default function TabelaIngredientes({ slots, alimentos, totalKgMS, onSlot
               <th className="text-left px-2 py-2.5 font-semibold text-gray-500 min-w-[140px]">Alimento</th>
               <th className="text-right px-2 py-2.5 font-semibold text-gray-500">kg MN</th>
               <th className="text-right px-2 py-2.5 font-semibold text-gray-500">kg MS</th>
+              <th className="text-right px-2 py-2.5 font-semibold text-gray-500">MS %</th>
               <th className="text-right px-2 py-2.5 font-semibold text-gray-500">R$/kg</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
             {slots.map((slot, idx) => {
               const alimento = slot.alimentoNome ? alimentos.find(a => a.nome === slot.alimentoNome) : null;
-              const kgMS = alimento ? slot.kgMN * alimento.ms : 0;
+              // MS% efetivo: override desta dieta quando existir, senão o do banco
+              const ms = slot.msOverride ?? (alimento?.ms ?? 0);
+              const kgMS = alimento ? slot.kgMN * ms : 0;
 
               const unit = units[slot.id] ?? 'kg';
 
@@ -293,7 +296,7 @@ export default function TabelaIngredientes({ slots, alimentos, totalKgMS, onSlot
                     <AlimentoSelect
                       value={slot.alimentoNome}
                       alimentos={alimentos}
-                      onChange={nome => onSlotChange(idx, { alimentoNome: nome, kgMN: nome ? slot.kgMN : 0, custoOverride: null })}
+                      onChange={nome => onSlotChange(idx, { alimentoNome: nome, kgMN: nome ? slot.kgMN : 0, custoOverride: null, msOverride: null })}
                     />
                   </td>
                   <td className="px-1 py-1">
@@ -321,7 +324,7 @@ export default function TabelaIngredientes({ slots, alimentos, totalKgMS, onSlot
                       </button>
                     </div>
                   </td>
-                  {/* kg MS editável — conta inversa via MS% do alimento (ponto 3) */}
+                  {/* kg MS editável — conta inversa via MS% efetivo (ponto 3) */}
                   <td className="px-1 py-1">
                     <div className="flex justify-end">
                       <EditableNum
@@ -329,11 +332,30 @@ export default function TabelaIngredientes({ slots, alimentos, totalKgMS, onSlot
                         dec={2}
                         disabled={!alimento}
                         onCommit={v => {
-                          if (alimento && alimento.ms > 0) onSlotChange(idx, { kgMN: v / alimento.ms });
+                          if (alimento && ms > 0) onSlotChange(idx, { kgMN: v / ms });
                         }}
                         className="w-14 text-right border border-gray-200 rounded-lg px-1.5 py-1 focus:outline-none focus:ring-1 focus:ring-green-500 disabled:bg-gray-50 disabled:text-gray-300 tabular-nums text-gray-700"
                       />
                     </div>
+                  </td>
+                  {/* MS% editável — override só desta dieta (afeta toda a composição) */}
+                  <td className="px-1 py-1">
+                    {alimento ? (
+                      <div className="flex justify-end">
+                        <EditableNum
+                          value={ms * 100}
+                          dec={1}
+                          onCommit={v => onSlotChange(idx, { msOverride: v > 0 ? v / 100 : null })}
+                          className={`w-14 text-right border rounded-lg px-1.5 py-1 focus:outline-none focus:ring-1 focus:ring-green-500 tabular-nums ${
+                            slot.msOverride != null && slot.msOverride !== alimento.ms
+                              ? 'border-amber-300 bg-amber-50 text-amber-800 font-semibold'
+                              : 'border-gray-200 text-gray-600'
+                          }`}
+                        />
+                      </div>
+                    ) : (
+                      <div className="text-right text-gray-300">—</div>
+                    )}
                   </td>
                   {/* R$/kg editável — override só desta dieta (ponto 4) */}
                   <td className="px-1 py-1">
@@ -369,7 +391,7 @@ export default function TabelaIngredientes({ slots, alimentos, totalKgMS, onSlot
               <td className="px-2 py-2 text-right tabular-nums text-gray-800">
                 {totalKgMS.toFixed(2)}
               </td>
-              <td />
+              <td colSpan={2} />
             </tr>
           </tfoot>
         </table>

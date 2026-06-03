@@ -151,6 +151,10 @@ export interface SlotIngrediente {
    *  do alimento na biblioteca. Ao salvar a dieta, o usuário pode optar por
    *  gravar também na biblioteca. */
   custoOverride?: number | null;
+  /** MS% (fração 0-1) ajustado SÓ para esta dieta (ex: carga do silo veio com
+   *  MS diferente). Quando ausente, usa o MS do alimento na biblioteca. Afeta
+   *  kg MS e todo o aporte de nutrientes. Pode ser gravado na biblioteca ao salvar. */
+  msOverride?: number | null;
 }
 
 export interface Dieta {

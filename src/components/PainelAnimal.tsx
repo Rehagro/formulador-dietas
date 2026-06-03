@@ -105,9 +105,10 @@ export default function PainelAnimal({ animal, onChange }: Props) {
           dica="Escore Condição Corporal (1=magra, 5=obesa). Vaca em lactação normal: 3,0." />
         <Campo label="Gordura"    hint="%"    value={animal.gordura}  min={1}   max={8}   step={0.1}  onChange={set('gordura')}
           dica="% de gordura do leite. Impacta o leite potencial pela energia." />
-        <Campo label="Proteína"   hint="%"    value={animal.proteina} min={1}   max={6}   step={0.1}  onChange={set('proteina')}
-          dica={"Proteína VERDADEIRA do leite (%, sem NPN). Se o laudo vier em 'Proteína Bruta', " +
-                "multiplique por 0,93 antes de digitar. Impacta o leite potencial pela proteína."} />
+        <Campo label="Proteína (PB)" hint="%" value={animal.proteina} min={1}   max={6}   step={0.1}  onChange={set('proteina')}
+          dica={"Proteína Bruta (PB) do leite (%), como vem no laudo. O sistema converte para " +
+                "proteína verdadeira automaticamente — não precisa multiplicar nada. " +
+                "Impacta o leite potencial pela proteína e a energia."} />
         <Campo label="Lactose"    hint="%"    value={animal.lactose}  min={1}   max={6}   step={0.1}  onChange={set('lactose')}
           dica="Lactose do leite (%). Normal: 4,6–4,8%. Impacta o leite potencial pela energia." />
         <Campo label="Preço leite" hint="R$/L" value={animal.precoLeite} min={0} max={10} step={0.05} onChange={set('precoLeite')}
