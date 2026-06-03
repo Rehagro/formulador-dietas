@@ -10,7 +10,7 @@ import { exportarXLSX } from '../utils/exportar';
 import { exportarPDF } from '../utils/exportarPDF';
 
 export default function Formulador() {
-  const { dieta, alimentos, setAnimal, setSlot, salvarDieta, novaDieta, adicionarSlot, reordenarSlots, removerSlot } = useDieta();
+  const { dieta, alimentos, setAnimal, setSlot, salvarDieta, editarAlimento, novaDieta, adicionarSlot, reordenarSlots, removerSlot } = useDieta();
   const [nomeDieta, setNomeDieta] = useState(dieta.nome);
   const [salvando, setSalvando] = useState(false);
   const [exportandoXLSX, setExportandoXLSX] = useState(false);
@@ -35,6 +35,30 @@ export default function Formulador() {
     try {
       await salvarDieta(nomeDieta);
       showToast('✅ Dieta salva com sucesso!');
+
+      // Ponto 4 — R$/kg editado nesta dieta: oferece gravar também na biblioteca.
+      const overridePorNome = new Map<string, number>();
+      for (const s of dieta.slots) {
+        if (s.custoOverride == null || !s.alimentoNome) continue;
+        const a = alimentos.find(x => x.nome === s.alimentoNome);
+        if (a && s.custoOverride !== a.custo) overridePorNome.set(s.alimentoNome, s.custoOverride);
+      }
+      if (overridePorNome.size > 0) {
+        const nomes = [...overridePorNome.keys()];
+        const ok = window.confirm(
+          `Você ajustou o R$/kg de ${nomes.length} alimento(s) nesta dieta:\n` +
+          `${nomes.join(', ')}\n\n` +
+          `Salvar também na biblioteca de alimentos? (vale para todas as dietas)\n` +
+          `Cancelar mantém o preço só nesta dieta.`,
+        );
+        if (ok) {
+          for (const [nome, custo] of overridePorNome) {
+            const a = alimentos.find(x => x.nome === nome);
+            if (a) await editarAlimento(nome, { ...a, custo });
+          }
+          showToast('💲 R$/kg atualizado na biblioteca.');
+        }
+      }
     } finally {
       setSalvando(false);
     }

@@ -147,6 +147,10 @@ export interface SlotIngrediente {
   id: string;
   alimentoNome: string | null;
   kgMN: number;
+  /** R$/kg ajustado SÓ para esta dieta (override). Quando ausente, usa o custo
+   *  do alimento na biblioteca. Ao salvar a dieta, o usuário pode optar por
+   *  gravar também na biblioteca. */
+  custoOverride?: number | null;
 }
 
 export interface Dieta {

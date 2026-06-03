@@ -131,6 +131,50 @@ function AlimentoSelect({
   );
 }
 
+/** Formata número para exibição, removendo zeros à direita. Vazio se 0. */
+function fmtNum(n: number, dec: number): string {
+  if (!isFinite(n) || n === 0) return '';
+  return String(parseFloat(n.toFixed(dec)));
+}
+
+/**
+ * Input numérico controlado por rascunho de texto. Permite digitar "0", "0,",
+ * "0.5" etc. sem o valor sumir (o número controlado coage 0 → vazio). Comita o
+ * número parseado a cada tecla; mostra o rascunho enquanto focado.
+ */
+function EditableNum({
+  value, onCommit, disabled, dec = 3, placeholder = '0', className = '',
+}: {
+  value: number;
+  onCommit: (n: number) => void;
+  disabled?: boolean;
+  dec?: number;
+  placeholder?: string;
+  className?: string;
+}) {
+  const [draft, setDraft] = useState<string | null>(null);
+  const shown = draft !== null ? draft : fmtNum(value, dec);
+  return (
+    <input
+      type="text"
+      inputMode="decimal"
+      value={shown}
+      placeholder={placeholder}
+      disabled={disabled}
+      onFocus={e => { setDraft(fmtNum(value, dec)); e.target.select(); }}
+      onChange={e => {
+        const raw = e.target.value;
+        if (!/^[0-9]*[.,]?[0-9]*$/.test(raw)) return;  // só número/decimal
+        setDraft(raw);
+        const n = parseFloat(raw.replace(',', '.'));
+        onCommit(isFinite(n) ? n : 0);
+      }}
+      onBlur={() => setDraft(null)}
+      className={className}
+    />
+  );
+}
+
 export default function TabelaIngredientes({ slots, alimentos, totalKgMS, onSlotChange, onAdicionarSlot, onReordenar, onRemoverSlot }: Props) {
   const [units, setUnits] = useState<Record<string, 'kg' | 'g'>>({});
   const [dragIdx, setDragIdx] = useState<number | null>(null);
@@ -210,9 +254,6 @@ export default function TabelaIngredientes({ slots, alimentos, totalKgMS, onSlot
               const pctMS = totalKgMS > 0 && kgMS > 0 ? (kgMS / totalKgMS) * 100 : 0;
 
               const unit = units[slot.id] ?? 'kg';
-              const displayVal = unit === 'g'
-                ? (slot.kgMN ? parseFloat((slot.kgMN * 1000).toFixed(1)) : '')
-                : (slot.kgMN || '');
 
               const isDragging = dragIdx === idx;
               const isOver = overIdx === idx && dragIdx !== idx;
@@ -260,23 +301,16 @@ export default function TabelaIngredientes({ slots, alimentos, totalKgMS, onSlot
                     <AlimentoSelect
                       value={slot.alimentoNome}
                       alimentos={alimentos}
-                      onChange={nome => onSlotChange(idx, { alimentoNome: nome, kgMN: nome ? slot.kgMN : 0 })}
+                      onChange={nome => onSlotChange(idx, { alimentoNome: nome, kgMN: nome ? slot.kgMN : 0, custoOverride: null })}
                     />
                   </td>
                   <td className="px-2 py-1">
-                    <div className="flex items-center gap-1">
-                      <input
-                        type="number"
-                        min={0}
-                        step={unit === 'g' ? 1 : 0.001}
-                        value={displayVal}
-                        placeholder="0"
+                    <div className="flex items-center justify-end gap-1">
+                      <EditableNum
+                        value={unit === 'g' ? slot.kgMN * 1000 : slot.kgMN}
+                        dec={unit === 'g' ? 1 : 3}
                         disabled={!alimento}
-                        onFocus={e => e.target.select()}
-                        onChange={e => {
-                          const v = parseFloat(e.target.value) || 0;
-                          onSlotChange(idx, { kgMN: unit === 'g' ? v / 1000 : v });
-                        }}
+                        onCommit={v => onSlotChange(idx, { kgMN: unit === 'g' ? v / 1000 : v })}
                         className="w-20 text-right border border-gray-200 rounded-lg px-1.5 py-1 focus:outline-none focus:ring-1 focus:ring-green-500 disabled:bg-gray-50 disabled:text-gray-300 tabular-nums font-semibold"
                       />
                       <button
@@ -295,8 +329,19 @@ export default function TabelaIngredientes({ slots, alimentos, totalKgMS, onSlot
                       </button>
                     </div>
                   </td>
-                  <td className="px-2 py-1.5 text-right tabular-nums text-gray-700">
-                    {kgMS > 0 ? kgMS.toFixed(2) : '—'}
+                  {/* kg MS editável — conta inversa via MS% do alimento (ponto 3) */}
+                  <td className="px-2 py-1">
+                    <div className="flex justify-end">
+                      <EditableNum
+                        value={kgMS}
+                        dec={2}
+                        disabled={!alimento}
+                        onCommit={v => {
+                          if (alimento && alimento.ms > 0) onSlotChange(idx, { kgMN: v / alimento.ms });
+                        }}
+                        className="w-20 text-right border border-gray-200 rounded-lg px-1.5 py-1 focus:outline-none focus:ring-1 focus:ring-green-500 disabled:bg-gray-50 disabled:text-gray-300 tabular-nums text-gray-700"
+                      />
+                    </div>
                   </td>
                   <td className="px-2 py-1.5 text-right tabular-nums text-gray-700">
                     {pctMS > 0 ? pctMS.toFixed(1) + '%' : '—'}
@@ -308,7 +353,22 @@ export default function TabelaIngredientes({ slots, alimentos, totalKgMS, onSlot
                       <td className="px-2 py-1.5 text-right tabular-nums text-gray-600">{(alimento.pb * 100).toFixed(2)}</td>
                       <td className="px-2 py-1.5 text-right tabular-nums text-gray-600">{alimento.fdn !== null ? (alimento.fdn * 100).toFixed(1) : '—'}</td>
                       <td className="px-2 py-1.5 text-right tabular-nums text-gray-600">{alimento.amido !== null ? (alimento.amido * 100).toFixed(1) : '—'}</td>
-                      <td className="px-2 py-1.5 text-right tabular-nums text-gray-600">{alimento.custo !== null ? alimento.custo.toFixed(3) : '—'}</td>
+                      {/* R$/kg editável — override só desta dieta (ponto 4) */}
+                      <td className="px-2 py-1">
+                        <div className="flex justify-end">
+                          <EditableNum
+                            value={slot.custoOverride ?? alimento.custo ?? 0}
+                            dec={3}
+                            placeholder="0,000"
+                            onCommit={v => onSlotChange(idx, { custoOverride: v })}
+                            className={`w-20 text-right border rounded-lg px-1.5 py-1 focus:outline-none focus:ring-1 focus:ring-green-500 tabular-nums ${
+                              slot.custoOverride != null && slot.custoOverride !== alimento.custo
+                                ? 'border-amber-300 bg-amber-50 text-amber-800 font-semibold'
+                                : 'border-gray-200 text-gray-600'
+                            }`}
+                          />
+                        </div>
+                      </td>
                     </>
                   ) : (
                     Array.from({ length: 6 }).map((_, i) => (

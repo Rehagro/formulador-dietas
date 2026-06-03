@@ -260,7 +260,9 @@ export function calcularResultados(
     totalKgMN += kgMN;
     totalKgMS += kgMS;
 
-    if (a.custo !== null) custoTotal += kgMN * a.custo;
+    // Custo: usa o override por dieta quando existir (Ponto 4 — R$/kg editável)
+    const custoEfetivo = slot.custoOverride ?? a.custo;
+    if (custoEfetivo !== null && custoEfetivo !== undefined) custoTotal += kgMN * custoEfetivo;
 
     const nel = calcularNelAlimento(a);
     const cnf = calcularCNFAlimento(a);
