@@ -18,6 +18,7 @@ export default function Formulador() {
   const [criandoNova, setCriandoNova] = useState(false);
   const [toastVisivel, setToastVisivel] = useState(false);
   const [toastMsg, setToastMsg] = useState('✅ Dieta salva com sucesso!');
+  const [promptCustos, setPromptCustos] = useState<Map<string, number> | null>(null);
 
   const resultado = useMemo(
     () => calcularResultados(dieta.slots, alimentos, dieta.animal),
@@ -43,24 +44,22 @@ export default function Formulador() {
         const a = alimentos.find(x => x.nome === s.alimentoNome);
         if (a && s.custoOverride !== a.custo) overridePorNome.set(s.alimentoNome, s.custoOverride);
       }
-      if (overridePorNome.size > 0) {
-        const nomes = [...overridePorNome.keys()];
-        const ok = window.confirm(
-          `Você ajustou o R$/kg de ${nomes.length} alimento(s) nesta dieta:\n` +
-          `${nomes.join(', ')}\n\n` +
-          `Salvar também na biblioteca de alimentos? (vale para todas as dietas)\n` +
-          `Cancelar mantém o preço só nesta dieta.`,
-        );
-        if (ok) {
-          for (const [nome, custo] of overridePorNome) {
-            const a = alimentos.find(x => x.nome === nome);
-            if (a) await editarAlimento(nome, { ...a, custo });
-          }
-          showToast('💲 R$/kg atualizado na biblioteca.');
-        }
-      }
+      if (overridePorNome.size > 0) setPromptCustos(overridePorNome);
     } finally {
       setSalvando(false);
+    }
+  }
+
+  // Resposta do modal de preços editados (ponto 4)
+  async function aplicarCustosBiblioteca(salvar: boolean) {
+    const map = promptCustos;
+    setPromptCustos(null);
+    if (salvar && map) {
+      for (const [nome, custo] of map) {
+        const a = alimentos.find(x => x.nome === nome);
+        if (a) await editarAlimento(nome, { ...a, custo });
+      }
+      showToast('💲 R$/kg atualizado na biblioteca.');
     }
   }
 
@@ -103,6 +102,49 @@ export default function Formulador() {
           {toastMsg}
         </div>
       </div>
+
+      {/* Modal — salvar R$/kg editado na biblioteca (ponto 4) */}
+      {promptCustos && (
+        <div className="fixed inset-0 bg-black/50 z-[70] flex items-center justify-center px-4">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md">
+            <div className="p-5 border-b border-gray-100 flex items-center gap-2">
+              <span className="text-xl">💲</span>
+              <h2 className="font-bold text-gray-800 text-lg">Salvar preço na biblioteca?</h2>
+            </div>
+            <div className="p-5 space-y-3">
+              <p className="text-sm text-gray-600">
+                Você ajustou o <strong>R$/kg</strong> de {promptCustos.size} alimento(s) nesta dieta:
+              </p>
+              <ul className="text-sm bg-gray-50 border border-gray-100 rounded-lg p-3 space-y-1 max-h-48 overflow-y-auto">
+                {[...promptCustos.entries()].map(([nome, custo]) => (
+                  <li key={nome} className="flex justify-between gap-3">
+                    <span className="text-gray-700 truncate">{nome}</span>
+                    <span className="font-semibold text-amber-700 tabular-nums whitespace-nowrap">R$ {custo.toFixed(3)}</span>
+                  </li>
+                ))}
+              </ul>
+              <p className="text-xs text-gray-500">
+                <strong>Salvar na biblioteca</strong> atualiza o preço para todas as dietas.{' '}
+                <strong>Só nesta dieta</strong> mantém o preço apenas aqui.
+              </p>
+            </div>
+            <div className="flex justify-end gap-2 p-4 border-t border-gray-100">
+              <button
+                onClick={() => aplicarCustosBiblioteca(false)}
+                className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg"
+              >
+                Só nesta dieta
+              </button>
+              <button
+                onClick={() => aplicarCustosBiblioteca(true)}
+                className="px-4 py-2 text-sm text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg font-medium"
+              >
+                Salvar na biblioteca
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Barra de ações */}
       <div className="flex items-center gap-2 flex-wrap">
