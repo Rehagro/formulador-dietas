@@ -1,5 +1,5 @@
-import { useState, useMemo } from 'react';
-import { Save, Download, RefreshCw, FileText } from 'lucide-react';
+import { useState, useMemo, useEffect } from 'react';
+import { Save, Download, RefreshCw, FileText, Undo2, Redo2 } from 'lucide-react';
 import { useDieta } from '../context/DietaContext';
 import PainelAnimal from '../components/PainelAnimal';
 import ResumoDieta from '../components/ResumoDieta';
@@ -11,8 +11,7 @@ import { exportarXLSX } from '../utils/exportar';
 import { exportarPDF } from '../utils/exportarPDF';
 
 export default function Formulador() {
-  const { dieta, alimentos, setAnimal, setSlot, salvarDieta, editarAlimento, novaDieta, adicionarSlot, reordenarSlots, removerSlot } = useDieta();
-  const [nomeDieta, setNomeDieta] = useState(dieta.nome);
+  const { dieta, alimentos, setAnimal, setSlot, escalarKgMN, setNome, undo, redo, podeDesfazer, podeRefazer, salvarDieta, editarAlimento, novaDieta, adicionarSlot, reordenarSlots, removerSlot } = useDieta();
   const [salvando, setSalvando] = useState(false);
   const [exportandoXLSX, setExportandoXLSX] = useState(false);
   const [exportandoPDF, setExportandoPDF] = useState(false);
@@ -32,10 +31,33 @@ export default function Formulador() {
     setTimeout(() => setToastVisivel(false), 2500);
   }
 
+  // Atalhos globais: Ctrl/Cmd+Z desfaz, Ctrl/Cmd+Shift+Z e Ctrl+Y refazem.
+  // Tira o foco do input ativo antes (limpa o rascunho de digitação) para o
+  // valor restaurado aparecer corretamente.
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (!(e.ctrlKey || e.metaKey)) return;
+      const k = e.key.toLowerCase();
+      if (k === 'z' && !e.shiftKey) {
+        if (!podeDesfazer) return;
+        e.preventDefault();
+        (document.activeElement as HTMLElement | null)?.blur?.();
+        undo();
+      } else if ((k === 'z' && e.shiftKey) || k === 'y') {
+        if (!podeRefazer) return;
+        e.preventDefault();
+        (document.activeElement as HTMLElement | null)?.blur?.();
+        redo();
+      }
+    }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [podeDesfazer, podeRefazer, undo, redo]);
+
   async function handleSalvar() {
     setSalvando(true);
     try {
-      await salvarDieta(nomeDieta);
+      await salvarDieta(dieta.nome);
       showToast('✅ Dieta salva com sucesso!');
 
       // R$/kg e MS% editados nesta dieta: oferece gravar também na biblioteca.
@@ -76,7 +98,7 @@ export default function Formulador() {
   async function handleExportar() {
     setExportandoXLSX(true);
     try {
-      await exportarXLSX({ ...dieta, nome: nomeDieta }, alimentos);
+      await exportarXLSX(dieta, alimentos);
       showToast('📊 Excel gerado com sucesso!');
     } finally {
       setExportandoXLSX(false);
@@ -86,7 +108,7 @@ export default function Formulador() {
   function handleExportarPDF() {
     setExportandoPDF(true);
     try {
-      exportarPDF({ ...dieta, nome: nomeDieta }, alimentos);
+      exportarPDF(dieta, alimentos);
       showToast('📄 PDF gerado com sucesso!');
     } finally {
       setTimeout(() => setExportandoPDF(false), 800);
@@ -97,7 +119,6 @@ export default function Formulador() {
     setCriandoNova(true);
     setTimeout(() => {
       novaDieta();
-      setNomeDieta('Nova Dieta');
       setCriandoNova(false);
     }, 400);
   }
@@ -164,11 +185,29 @@ export default function Formulador() {
       <div className="flex items-center gap-2 flex-wrap">
         <input
           type="text"
-          value={nomeDieta}
-          onChange={e => setNomeDieta(e.target.value)}
+          value={dieta.nome}
+          onChange={e => setNome(e.target.value)}
           className="border border-gray-300 rounded-lg px-3 py-2 text-sm font-medium flex-1 min-w-[200px] max-w-xs focus:outline-none focus:ring-2 focus:ring-green-500"
           placeholder="Nome da dieta..."
         />
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => { (document.activeElement as HTMLElement | null)?.blur?.(); undo(); }}
+            disabled={!podeDesfazer}
+            title="Desfazer (Ctrl+Z)"
+            className="flex items-center justify-center w-11 h-11 rounded-lg text-sky-700 bg-sky-100 hover:bg-sky-200 active:scale-95 disabled:text-gray-300 disabled:bg-gray-50 disabled:cursor-not-allowed transition-all"
+          >
+            <Undo2 size={20} />
+          </button>
+          <button
+            onClick={() => { (document.activeElement as HTMLElement | null)?.blur?.(); redo(); }}
+            disabled={!podeRefazer}
+            title="Refazer (Ctrl+Shift+Z)"
+            className="flex items-center justify-center w-11 h-11 rounded-lg text-sky-700 bg-sky-100 hover:bg-sky-200 active:scale-95 disabled:text-gray-300 disabled:bg-gray-50 disabled:cursor-not-allowed transition-all"
+          >
+            <Redo2 size={20} />
+          </button>
+        </div>
         <button
           onClick={handleSalvar}
           disabled={salvando}
@@ -225,6 +264,7 @@ export default function Formulador() {
           onAdicionarSlot={adicionarSlot}
           onReordenar={reordenarSlots}
           onRemoverSlot={removerSlot}
+          onEscalar={escalarKgMN}
         />
         <div className="flex flex-col gap-4">
           <PainelNutrientes resultado={resultado} leite={dieta.animal.leite} />

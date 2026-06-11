@@ -13,6 +13,7 @@ interface Props {
   onAdicionarSlot: () => void;
   onReordenar: (de: number, para: number) => void;
   onRemoverSlot: (idx: number) => void;
+  onEscalar: (fator: number) => void;
 }
 
 function AlimentoSelect({
@@ -174,7 +175,44 @@ function EditableNum({
   );
 }
 
-export default function TabelaIngredientes({ slots, alimentos, totalKgMS, onSlotChange, onAdicionarSlot, onReordenar, onRemoverSlot }: Props) {
+/**
+ * Total de kg MS editável no rodapé. Diferente do EditableNum, só aplica a escala
+ * ao CONFIRMAR (Enter ou blur) — escalar a cada tecla cascatearia o total enquanto
+ * digita. Ao confirmar um alvo T, escala todos os insumos por T / total_atual.
+ */
+function TotalMSEditavel({ total, onEscalar }: { total: number; onEscalar: (fator: number) => void }) {
+  const [draft, setDraft] = useState<string | null>(null);
+  const shown = draft !== null ? draft : (total > 0 ? String(parseFloat(total.toFixed(2))) : '');
+  const editavel = total > 0;
+
+  const aplicar = () => {
+    if (draft === null) return;
+    const alvo = parseFloat(draft.replace(',', '.'));
+    if (isFinite(alvo) && alvo > 0 && total > 0) onEscalar(alvo / total);
+    setDraft(null);
+  };
+
+  return (
+    <input
+      type="text"
+      inputMode="decimal"
+      value={shown}
+      disabled={!editavel}
+      title={editavel ? 'Digite o total de MS desejado — os insumos escalam proporcionalmente' : 'Adicione insumos para poder escalar o total'}
+      onFocus={e => { setDraft(String(parseFloat(total.toFixed(2)))); e.target.select(); }}
+      onChange={e => {
+        const raw = e.target.value;
+        if (!/^[0-9]*[.,]?[0-9]*$/.test(raw)) return;
+        setDraft(raw);
+      }}
+      onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); (e.target as HTMLInputElement).blur(); } }}
+      onBlur={aplicar}
+      className="w-16 text-right border border-transparent hover:border-gray-300 focus:border-green-500 rounded-lg px-1.5 py-1 focus:outline-none focus:ring-1 focus:ring-green-500 bg-transparent focus:bg-white tabular-nums font-semibold text-gray-800 disabled:cursor-not-allowed"
+    />
+  );
+}
+
+export default function TabelaIngredientes({ slots, alimentos, totalKgMS, onSlotChange, onAdicionarSlot, onReordenar, onRemoverSlot, onEscalar }: Props) {
   const [units, setUnits] = useState<Record<string, 'kg' | 'g'>>({});
   const [dragIdx, setDragIdx] = useState<number | null>(null);
   const [overIdx, setOverIdx] = useState<number | null>(null);
@@ -388,8 +426,10 @@ export default function TabelaIngredientes({ slots, alimentos, totalKgMS, onSlot
               <td className="px-2 py-2 text-right tabular-nums text-gray-800">
                 {slots.reduce((s, sl) => s + sl.kgMN, 0).toFixed(2)}
               </td>
-              <td className="px-2 py-2 text-right tabular-nums text-gray-800">
-                {totalKgMS.toFixed(2)}
+              <td className="px-1 py-2 text-right">
+                <div className="flex justify-end">
+                  <TotalMSEditavel total={totalKgMS} onEscalar={onEscalar} />
+                </div>
               </td>
               <td colSpan={2} />
             </tr>

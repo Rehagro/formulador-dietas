@@ -911,9 +911,9 @@ export function calcularResultados(
   };
 }
 
-export function formatarValor(valor: number, unidade: string): string {
+export function formatarValor(valor: number, unidade: string, casasPct?: number): string {
   if (!isFinite(valor) || isNaN(valor)) return '—';
-  if (unidade === '% MS' || unidade === '%') return (valor * 100).toFixed(2) + '%';
+  if (unidade === '% MS' || unidade === '%') return (valor * 100).toFixed(casasPct ?? 2) + '%';
   if (unidade === 'Mcal/kg') return valor.toFixed(3);
   if (unidade === 'kg/d') return valor.toFixed(1) + ' kg';
   if (unidade === 'UFC/kg') {

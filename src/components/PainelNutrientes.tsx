@@ -9,6 +9,15 @@ interface Props {
   leite: number;
 }
 
+// Nutrientes que exibem 1 casa decimal (energia, proteína, fibra, gordura) —
+// valor e faixa de referência. Met/Lys e a aba Minerais & Vitaminas mantêm 2 casas.
+const NUTRIENTES_1_CASA = new Set([
+  'cnf', 'amido', 'amido_deg',
+  'pb', 'pdr', 'pndr',
+  'fdn', 'efdn', 'fdnf', 'fda',
+  'ee', 'ee_insat',
+]);
+
 function NutrienteRow({ chave, valor, refs }: {
   chave: string; valor: number; refs: Record<string, Referencia>;
 }) {
@@ -17,17 +26,18 @@ function NutrienteRow({ chave, valor, refs }: {
   const status = getStatus(valor, ref);
   const color = statusColor(status);
   const dot = statusDot(status);
-  const valorFormatado = formatarValor(valor, ref.unidade);
+  const casas = NUTRIENTES_1_CASA.has(chave) ? 1 : undefined;
+  const valorFormatado = formatarValor(valor, ref.unidade, casas);
 
   // Faixa-recomendação (orientador pedagógico — mantida por pedido do usuário)
   const refStr = ref.ref !== undefined
     ? ref.ref
     : ref.min !== undefined && ref.max !== undefined
-    ? `${formatarValor(ref.min, ref.unidade)} – ${formatarValor(ref.max, ref.unidade)}`
+    ? `${formatarValor(ref.min, ref.unidade, casas)} – ${formatarValor(ref.max, ref.unidade, casas)}`
     : ref.min !== undefined
-    ? `≥ ${formatarValor(ref.min, ref.unidade)}`
+    ? `≥ ${formatarValor(ref.min, ref.unidade, casas)}`
     : ref.max !== undefined
-    ? `≤ ${formatarValor(ref.max, ref.unidade)}`
+    ? `≤ ${formatarValor(ref.max, ref.unidade, casas)}`
     : '';
 
   return (

@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, useRef, type ReactNode } from 'react';
 import type { User } from '@supabase/supabase-js';
 import type { Dieta, Alimento, SlotIngrediente, AnimalLactacao } from '../types';
 import alimentosBase from '../data/alimentos.json';
@@ -74,6 +74,12 @@ interface DietaContextType {
   logout: () => Promise<void>;
   setAnimal: (animal: AnimalLactacao) => void;
   setSlot: (idx: number, slot: Partial<SlotIngrediente>) => void;
+  escalarKgMN: (fator: number) => void;
+  setNome: (nome: string) => void;
+  undo: () => void;
+  redo: () => void;
+  podeDesfazer: boolean;
+  podeRefazer: boolean;
   salvarDieta: (nome: string) => Promise<void>;
   carregarDieta: (id: string) => void;
   novaDieta: () => void;
@@ -96,7 +102,54 @@ export function DietaProvider({ children }: { children: ReactNode }) {
   const [carregando, setCarregando] = useState(true);
   const [alimentos, setAlimentos] = useState<Alimento[]>(alimentosBase as Alimento[]);
   const [dietas, setDietas] = useState<Dieta[]>([]);
-  const [dieta, setDieta] = useState<Dieta>(dietaNova);
+
+  // Histórico para Desfazer/Refazer. `present` é a dieta atual; `past`/`future`
+  // guardam snapshots imutáveis (cap HIST_MAX). Edições do usuário passam por
+  // `aplicarEdicao`; carregar/nova/duplicar zeram o histórico (checkpoints).
+  const HIST_MAX = 50;
+  const [hist, setHist] = useState<{ present: Dieta; past: Dieta[]; future: Dieta[] }>(
+    () => ({ present: dietaNova(), past: [], future: [] })
+  );
+  const dieta = hist.present;
+  // Chave de coalescência: edições consecutivas com a mesma chave (ex: digitar
+  // dígito a dígito no mesmo campo) viram UM passo de undo, não um por tecla.
+  const lastCoalesceKey = useRef<string | null>(null);
+
+  const aplicarEdicao = useCallback((updater: (d: Dieta) => Dieta, coalesceKey?: string) => {
+    // Decide coalescência e atualiza o ref FORA do updater (updater puro — seguro
+    // sob StrictMode, que invoca o updater duas vezes).
+    const coalesce = !!coalesceKey && coalesceKey === lastCoalesceKey.current;
+    lastCoalesceKey.current = coalesceKey ?? null;
+    setHist(h => {
+      const present = updater(h.present);
+      return coalesce
+        ? { present, past: h.past, future: [] }                          // mesma edição → substitui
+        : { present, past: [...h.past, h.present].slice(-HIST_MAX), future: [] };
+    });
+  }, []);
+
+  const resetHistorico = useCallback((nova: Dieta) => {
+    lastCoalesceKey.current = null;
+    setHist({ present: nova, past: [], future: [] });
+  }, []);
+
+  const undo = useCallback(() => {
+    lastCoalesceKey.current = null;
+    setHist(h => {
+      if (h.past.length === 0) return h;
+      const present = h.past[h.past.length - 1];
+      return { present, past: h.past.slice(0, -1), future: [h.present, ...h.future].slice(0, HIST_MAX) };
+    });
+  }, []);
+
+  const redo = useCallback(() => {
+    lastCoalesceKey.current = null;
+    setHist(h => {
+      if (h.future.length === 0) return h;
+      const present = h.future[0];
+      return { present, past: [...h.past, h.present].slice(-HIST_MAX), future: h.future.slice(1) };
+    });
+  }, []);
 
   // Carrega dados do Supabase na inicialização
   useEffect(() => {
@@ -141,7 +194,10 @@ export function DietaProvider({ children }: { children: ReactNode }) {
         }));
         setDietas(dietasNormalizadas);
         if (dietasNormalizadas.length > 0) {
-          setDieta({ ...dietasNormalizadas[0], slots: normalizarSlots(dietasNormalizadas[0].slots) });
+          setHist({
+            present: { ...dietasNormalizadas[0], slots: normalizarSlots(dietasNormalizadas[0].slots) },
+            past: [], future: [],
+          });
         }
       } catch (err) {
         console.error('Erro ao inicializar dados:', err);
@@ -157,53 +213,68 @@ export function DietaProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const setAnimal = useCallback((animal: AnimalLactacao) => {
-    setDieta(d => ({ ...d, animal }));
-  }, []);
+    aplicarEdicao(d => ({ ...d, animal }), 'animal');
+  }, [aplicarEdicao]);
 
   const setSlot = useCallback((idx: number, partial: Partial<SlotIngrediente>) => {
-    setDieta(d => {
-      const slots = [...d.slots];
-      slots[idx] = { ...slots[idx], ...partial };
-      return { ...d, slots };
-    });
-  }, []);
+    aplicarEdicao(
+      d => {
+        const slots = [...d.slots];
+        slots[idx] = { ...slots[idx], ...partial };
+        return { ...d, slots };
+      },
+      `slot:${idx}:${Object.keys(partial).sort().join(',')}`
+    );
+  }, [aplicarEdicao]);
+
+  const setNome = useCallback((nome: string) => {
+    aplicarEdicao(d => ({ ...d, nome }), 'nome');
+  }, [aplicarEdicao]);
+
+  /** Escala o kgMN de todos os insumos preenchidos por um fator (ajuste único do
+   *  total de MS). Mantém proporção entre ingredientes. No-op se fator inválido.
+   *  Sem chave de coalescência → cada escalonamento é um passo de undo próprio. */
+  const escalarKgMN = useCallback((fator: number) => {
+    if (!isFinite(fator) || fator <= 0) return;
+    aplicarEdicao(d => ({
+      ...d,
+      slots: d.slots.map(s =>
+        s.alimentoNome && s.kgMN > 0 ? { ...s, kgMN: s.kgMN * fator } : s
+      ),
+    }));
+  }, [aplicarEdicao]);
 
   const salvarDieta = useCallback(async (nome: string) => {
     const atualizada = { ...dieta, nome };
-    setDieta(atualizada);
+    // Atualiza só o `present` (salvar é checkpoint, não cria passo de undo).
+    setHist(h => ({ ...h, present: atualizada }));
     setDietas(prev => [atualizada, ...prev.filter(x => x.id !== atualizada.id)]);
     await saveDietaSupabase(atualizada);
   }, [dieta]);
 
   const carregarDieta = useCallback((id: string) => {
-    setDietas(prev => {
-      const d = prev.find(x => x.id === id);
-      if (d) setDieta({ ...d, animal: normalizarAnimal(d.animal), slots: normalizarSlots(d.slots) });
-      return prev;
-    });
-  }, []);
+    const d = dietas.find(x => x.id === id);
+    if (d) resetHistorico({ ...d, animal: normalizarAnimal(d.animal), slots: normalizarSlots(d.slots) });
+  }, [dietas, resetHistorico]);
 
   const novaDieta = useCallback(() => {
-    setDieta(dietaNova());
-  }, []);
+    resetHistorico(dietaNova());
+  }, [resetHistorico]);
 
   const duplicarDieta = useCallback((id: string) => {
-    setDietas(prev => {
-      const orig = prev.find(x => x.id === id);
-      if (!orig) return prev;
-      const copia: Dieta = {
-        ...orig,
-        id: gerarId(),
-        nome: `Cópia de ${orig.nome}`,
-        criadaEm: new Date().toISOString(),
-        slots: orig.slots.map(s => ({ ...s, id: gerarId() })),
-      };
-      const nova = [copia, ...prev];
-      saveDietaSupabase(copia).catch(console.error);
-      setDieta(copia);
-      return nova;
-    });
-  }, []);
+    const orig = dietas.find(x => x.id === id);
+    if (!orig) return;
+    const copia: Dieta = {
+      ...orig,
+      id: gerarId(),
+      nome: `Cópia de ${orig.nome}`,
+      criadaEm: new Date().toISOString(),
+      slots: orig.slots.map(s => ({ ...s, id: gerarId() })),
+    };
+    setDietas(prev => [copia, ...prev]);
+    saveDietaSupabase(copia).catch(console.error);
+    resetHistorico(copia);
+  }, [dietas, resetHistorico]);
 
   const excluirDieta = useCallback(async (id: string) => {
     await deleteDietaSupabase(id);
@@ -217,43 +288,47 @@ export function DietaProvider({ children }: { children: ReactNode }) {
       if (dietaAtualizada) saveDietaSupabase(dietaAtualizada).catch(console.error);
       return nova;
     });
-    setDieta(d => d.id === id ? { ...d, nome } : d);
+    setHist(h => h.present.id === id ? { ...h, present: { ...h.present, nome } } : h);
   }, []);
 
   const reordenarSlots = useCallback((de: number, para: number) => {
-    setDieta(d => {
+    aplicarEdicao(d => {
       const slots = [...d.slots];
       const [item] = slots.splice(de, 1);
       slots.splice(para, 0, item);
       return { ...d, slots };
     });
-  }, []);
+  }, [aplicarEdicao]);
 
   const removerSlot = useCallback((idx: number) => {
-    setDieta(d => {
+    aplicarEdicao(d => {
       const slots = d.slots.filter((_, i) => i !== idx);
       while (slots.length < 4) {
         slots.push({ id: gerarId(), alimentoNome: null, kgMN: 0 });
       }
       return { ...d, slots };
     });
-  }, []);
+  }, [aplicarEdicao]);
 
   const atualizarNomeNosSlots = useCallback((nomeAntigo: string, nomeNovo: string) => {
-    setDieta(d => ({
-      ...d,
-      slots: d.slots.map(s =>
-        s.alimentoNome === nomeAntigo ? { ...s, alimentoNome: nomeNovo } : s
-      ),
+    // Sincroniza renome vindo da biblioteca; não é uma edição "desfazível" da dieta.
+    setHist(h => ({
+      ...h,
+      present: {
+        ...h.present,
+        slots: h.present.slots.map(s =>
+          s.alimentoNome === nomeAntigo ? { ...s, alimentoNome: nomeNovo } : s
+        ),
+      },
     }));
   }, []);
 
   const adicionarSlot = useCallback(() => {
-    setDieta(d => ({
+    aplicarEdicao(d => ({
       ...d,
       slots: [...d.slots, { id: gerarId(), alimentoNome: null, kgMN: 0 }],
     }));
-  }, []);
+  }, [aplicarEdicao]);
 
   const adicionarAlimento = useCallback(async (a: Alimento) => {
     const id = await saveAlimentoCustomSupabase(a);
@@ -290,7 +365,8 @@ export function DietaProvider({ children }: { children: ReactNode }) {
   return (
     <DietaContext.Provider value={{
       dieta, alimentos, dietas, carregando, usuario, logout,
-      setAnimal, setSlot,
+      setAnimal, setSlot, escalarKgMN, setNome,
+      undo, redo, podeDesfazer: hist.past.length > 0, podeRefazer: hist.future.length > 0,
       salvarDieta, carregarDieta, novaDieta, duplicarDieta, excluirDieta, renomearDieta,
       adicionarSlot, reordenarSlots, removerSlot, atualizarNomeNosSlots,
       adicionarAlimento, editarAlimento, excluirAlimento,
