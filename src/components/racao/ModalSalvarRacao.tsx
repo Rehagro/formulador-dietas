@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { X, Save, Wheat } from 'lucide-react';
 import { useDieta } from '../../context/DietaContext';
 import { useRacao, type RacaoEmConstrucao } from '../../context/RacaoContext';
@@ -14,13 +15,19 @@ interface Props {
 }
 
 export default function ModalSalvarRacao({ racao, resultado, onClose, onSaved }: Props) {
-  const { alimentos, adicionarAlimento, editarAlimento } = useDieta();
+  const { alimentos, adicionarAlimento, editarAlimento, aplicarRacaoLocal } = useDieta();
   const { limpar } = useRacao();
+  const navigate = useNavigate();
   const editando = !!racao.editando_nome;
+  // Quando a ração foi aberta de um slot de dieta, oferece "Salvar só nesta dieta".
+  const temLocal = !!racao.origem_slot_id;
 
-  // Quando a ração já foi salva (editando), o usuário escolhe sobrescrever a
-  // atual ou salvar como uma nova ração. Sem edição prévia, só existe "nova".
-  const [modo, setModo] = useState<'sobrescrever' | 'nova'>(editando ? 'sobrescrever' : 'nova');
+  // Modos: sobrescrever ração do banco / gerar nova / gravar só nesta dieta.
+  // Default = "local" quando veio de um slot (não mexe no banco/outras dietas);
+  // senão sobrescrever (edição da biblioteca) ou nova.
+  const [modo, setModo] = useState<'sobrescrever' | 'nova' | 'local'>(
+    temLocal ? 'local' : editando ? 'sobrescrever' : 'nova'
+  );
   const [nome, setNome] = useState(
     racao.nome && !editando ? racao.nome : `Ração ${new Date().toLocaleDateString('pt-BR')}`
   );
@@ -35,6 +42,20 @@ export default function ModalSalvarRacao({ racao, resultado, onClose, onSaved }:
 
   const salvar = async () => {
     setErro(null);
+
+    // "Só nesta dieta": grava racaoOverride no slot de origem e volta para a Dieta.
+    // Não cria/edita alimento no banco.
+    if (modo === 'local') {
+      if (!racao.origem_slot_id) { setErro('Origem do slot não encontrada.'); return; }
+      aplicarRacaoLocal(racao.origem_slot_id, {
+        receita: racao.ingredientes.map(i => ({ alimento_nome: i.alimento_nome, kg_d: i.kg_d })),
+        capacidade_misturador_kg: racao.capacidade_misturador_kg,
+      });
+      limpar();
+      navigate('/');
+      return;
+    }
+
     if (modo === 'nova' && !nome.trim()) { setErro('Informe o nome da ração.'); return; }
     if (conflito) { setErro('Já existe um alimento com esse nome. Escolha outro.'); return; }
 
@@ -76,10 +97,14 @@ export default function ModalSalvarRacao({ racao, resultado, onClose, onSaved }:
             <Wheat size={20} className="text-amber-500" />
             <div>
               <h2 className="font-bold text-gray-800 text-lg">
-                {modo === 'sobrescrever' ? 'Atualizar ração' : 'Salvar ração na biblioteca'}
+                {modo === 'local' ? 'Salvar só nesta dieta'
+                  : modo === 'sobrescrever' ? 'Atualizar ração'
+                  : 'Salvar ração na biblioteca'}
               </h2>
               <p className="text-sm text-gray-500 mt-0.5">
-                Vira um alimento Concentrado, disponível para usar em qualquer dieta.
+                {modo === 'local'
+                  ? 'A ração editada fica só nesta dieta; o banco não muda.'
+                  : 'Vira um alimento Concentrado, disponível para usar em qualquer dieta.'}
               </p>
             </div>
           </div>
@@ -89,20 +114,34 @@ export default function ModalSalvarRacao({ racao, resultado, onClose, onSaved }:
         </div>
 
         <div className="p-5 space-y-4">
-          {/* Escolha: sobrescrever a ração salva ou salvar como nova */}
-          {editando && (
+          {/* Escolha: só nesta dieta / sobrescrever banco / nova ração */}
+          {(editando || temLocal) && (
             <div className="space-y-1.5">
               <span className="text-xs text-gray-600 font-medium block">Como salvar?</span>
-              <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
-                <input
-                  type="radio"
-                  name="modo-salvar"
-                  checked={modo === 'sobrescrever'}
-                  onChange={() => setModo('sobrescrever')}
-                  className="accent-emerald-600"
-                />
-                Sobrescrever <strong>{racao.editando_nome}</strong>
-              </label>
+              {temLocal && (
+                <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="modo-salvar"
+                    checked={modo === 'local'}
+                    onChange={() => setModo('local')}
+                    className="accent-emerald-600"
+                  />
+                  Salvar <strong>só nesta dieta</strong> (não altera o banco)
+                </label>
+              )}
+              {editando && (
+                <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="modo-salvar"
+                    checked={modo === 'sobrescrever'}
+                    onChange={() => setModo('sobrescrever')}
+                    className="accent-emerald-600"
+                  />
+                  Sobrescrever <strong>{racao.editando_nome}</strong> no banco
+                </label>
+              )}
               <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
                 <input
                   type="radio"
@@ -111,26 +150,28 @@ export default function ModalSalvarRacao({ racao, resultado, onClose, onSaved }:
                   onChange={() => setModo('nova')}
                   className="accent-emerald-600"
                 />
-                Salvar como uma nova ração
+                Gerar uma nova ração no banco
               </label>
             </div>
           )}
 
-          <label className="block text-xs">
-            <span className="text-gray-600 font-medium">Nome da ração</span>
-            <input
-              type="text"
-              value={modo === 'sobrescrever' ? (racao.editando_nome ?? '') : nome}
-              onChange={e => setNome(e.target.value)}
-              disabled={modo === 'sobrescrever'}
-              className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 disabled:bg-gray-50"
-            />
-            {modo === 'sobrescrever' && (
-              <span className="text-[11px] text-gray-400 mt-0.5 block">
-                Vai atualizar a ração existente. Escolha "nova ração" acima para criar uma cópia com outro nome.
-              </span>
-            )}
-          </label>
+          {modo !== 'local' && (
+            <label className="block text-xs">
+              <span className="text-gray-600 font-medium">Nome da ração</span>
+              <input
+                type="text"
+                value={modo === 'sobrescrever' ? (racao.editando_nome ?? '') : nome}
+                onChange={e => setNome(e.target.value)}
+                disabled={modo === 'sobrescrever'}
+                className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 disabled:bg-gray-50"
+              />
+              {modo === 'sobrescrever' && (
+                <span className="text-[11px] text-gray-400 mt-0.5 block">
+                  Vai atualizar a ração existente. Escolha "nova ração" acima para criar uma cópia com outro nome.
+                </span>
+              )}
+            </label>
+          )}
 
           <div className="grid grid-cols-2 gap-3">
             <div className="bg-gray-50 border border-gray-100 rounded-lg p-2.5">
@@ -143,21 +184,23 @@ export default function ModalSalvarRacao({ racao, resultado, onClose, onSaved }:
             </div>
           </div>
 
-          <label className="block text-xs">
-            <span className="text-gray-600 font-medium">Custo da ração (R$/kg)</span>
-            <input
-              type="number"
-              step="0.001"
-              min="0"
-              value={custo}
-              onChange={e => setCusto(e.target.value)}
-              className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm tabular-nums focus:outline-none focus:ring-2 focus:ring-amber-400"
-            />
-            <span className="text-[11px] text-gray-400 mt-0.5 block">
-              Default = custo médio calculado da batida (R$/kg). Você pode editar
-              depois pelo modal de Alimento como qualquer outro ingrediente.
-            </span>
-          </label>
+          {modo !== 'local' && (
+            <label className="block text-xs">
+              <span className="text-gray-600 font-medium">Custo da ração (R$/kg)</span>
+              <input
+                type="number"
+                step="0.001"
+                min="0"
+                value={custo}
+                onChange={e => setCusto(e.target.value)}
+                className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm tabular-nums focus:outline-none focus:ring-2 focus:ring-amber-400"
+              />
+              <span className="text-[11px] text-gray-400 mt-0.5 block">
+                Default = custo médio calculado da batida (R$/kg). Você pode editar
+                depois pelo modal de Alimento como qualquer outro ingrediente.
+              </span>
+            </label>
+          )}
 
           <div className="bg-amber-50 border border-amber-100 rounded-lg p-3 text-xs text-amber-900">
             <div className="font-semibold mb-1">Resumo da mistura</div>
@@ -189,7 +232,9 @@ export default function ModalSalvarRacao({ racao, resultado, onClose, onSaved }:
             disabled={salvando || (modo === 'nova' && !nome.trim()) || conflito}
             className="flex items-center gap-1.5 px-4 py-2 text-sm text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg disabled:bg-gray-300"
           >
-            <Save size={14} /> {salvando ? 'Salvando...' : (modo === 'sobrescrever' ? 'Atualizar' : 'Salvar')}
+            <Save size={14} /> {salvando ? 'Salvando...'
+              : modo === 'local' ? 'Salvar nesta dieta'
+              : modo === 'sobrescrever' ? 'Atualizar' : 'Salvar'}
           </button>
         </div>
       </div>

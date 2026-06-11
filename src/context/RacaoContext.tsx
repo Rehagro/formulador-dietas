@@ -18,14 +18,19 @@ export interface RacaoEmConstrucao {
   /** Se vier de uma ração existente da biblioteca, guarda o nome para
    *  exibir "Editando: Ração X" e oferecer atualização. */
   editando_nome?: string;
+  /** Se a ração foi aberta a partir de um slot de uma dieta, guarda o id do slot
+   *  para oferecer "Salvar só nesta dieta" (grava racaoOverride no slot). */
+  origem_slot_id?: string;
 }
 
 interface RacaoContextType {
   racao: RacaoEmConstrucao | null;
   /** Inicializa nova ração com ingredientes pré-selecionados da dieta. */
   iniciarComIngredientes: (ingredientes: IngredienteRacao[]) => void;
-  /** Inicializa a partir de uma ração salva da biblioteca (modo edição). */
-  iniciarEdicao: (alimento_nome: string, origem: OrigemRacao) => void;
+  /** Inicializa a partir de uma ração salva da biblioteca (modo edição).
+   *  `origemSlotId` opcional: quando aberta de um slot de dieta, habilita
+   *  "Salvar só nesta dieta". */
+  iniciarEdicao: (alimento_nome: string, origem: OrigemRacao, origemSlotId?: string) => void;
   /** Limpa o estado (após salvar ou cancelar). */
   limpar: () => void;
   /** Atualiza o estado durante a edição na tela. */
@@ -74,13 +79,14 @@ export function RacaoProvider({ children }: { children: ReactNode }) {
     });
   };
 
-  const iniciarEdicao = (alimento_nome: string, origem: OrigemRacao) => {
+  const iniciarEdicao = (alimento_nome: string, origem: OrigemRacao, origemSlotId?: string) => {
     setRacao({
       nome: alimento_nome,
       fazenda: origem.fazenda,
       capacidade_misturador_kg: origem.capacidade_misturador_kg,
       ingredientes: origem.receita,
       editando_nome: alimento_nome,
+      origem_slot_id: origemSlotId,
     });
   };
 

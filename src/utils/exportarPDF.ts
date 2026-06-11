@@ -1,7 +1,7 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import type { Dieta, Alimento } from '../types';
-import { calcularResultados, formatarValor } from './calculos';
+import { calcularResultados, formatarValor, resolverAlimentoDoSlot } from './calculos';
 import { getReferenciasLactacao, getStatus } from './referencias';
 
 // ── Paleta ──────────────────────────────────────────────────────────────────
@@ -125,9 +125,9 @@ export function exportarPDF(dieta: Dieta, alimentos: Alimento[]): void {
 
   const slots = dieta.slots.filter(s => s.alimentoNome && s.kgMN > 0);
   const ingBody = slots.map(s => {
-    const a = alimentos.find(x => x.nome === s.alimentoNome);
+    const a = resolverAlimentoDoSlot(s, alimentos);
     if (!a) return [s.alimentoNome ?? '', '-', '-', '-'];
-    const kgMS = s.kgMN * a.ms;
+    const kgMS = s.kgMN * (s.msOverride ?? a.ms);
     const pct = resultado.totalKgMS > 0 ? ((kgMS / resultado.totalKgMS) * 100).toFixed(1) + '%' : '-';
     return [s.alimentoNome ?? '', s.kgMN.toFixed(2), kgMS.toFixed(2), pct];
   });

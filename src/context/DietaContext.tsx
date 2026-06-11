@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef, type ReactNode } from 'react';
 import type { User } from '@supabase/supabase-js';
-import type { Dieta, Alimento, SlotIngrediente, AnimalLactacao } from '../types';
+import type { Dieta, Alimento, SlotIngrediente, AnimalLactacao, RacaoOverride } from '../types';
 import alimentosBase from '../data/alimentos.json';
 import {
   supabase,
@@ -75,6 +75,7 @@ interface DietaContextType {
   setAnimal: (animal: AnimalLactacao) => void;
   setSlot: (idx: number, slot: Partial<SlotIngrediente>) => void;
   escalarKgMN: (fator: number) => void;
+  aplicarRacaoLocal: (slotId: string, override: RacaoOverride) => void;
   setNome: (nome: string) => void;
   undo: () => void;
   redo: () => void;
@@ -231,6 +232,15 @@ export function DietaProvider({ children }: { children: ReactNode }) {
     aplicarEdicao(d => ({ ...d, nome }), 'nome');
   }, [aplicarEdicao]);
 
+  /** Grava uma ração editada só nesta dieta (racaoOverride) no slot de id dado.
+   *  Usado pelo "Salvar só nesta dieta" do Formulador de Ração. */
+  const aplicarRacaoLocal = useCallback((slotId: string, override: RacaoOverride) => {
+    aplicarEdicao(d => ({
+      ...d,
+      slots: d.slots.map(s => s.id === slotId ? { ...s, racaoOverride: override } : s),
+    }));
+  }, [aplicarEdicao]);
+
   /** Escala o kgMN de todos os insumos preenchidos por um fator (ajuste único do
    *  total de MS). Mantém proporção entre ingredientes. No-op se fator inválido.
    *  Sem chave de coalescência → cada escalonamento é um passo de undo próprio. */
@@ -365,7 +375,7 @@ export function DietaProvider({ children }: { children: ReactNode }) {
   return (
     <DietaContext.Provider value={{
       dieta, alimentos, dietas, carregando, usuario, logout,
-      setAnimal, setSlot, escalarKgMN, setNome,
+      setAnimal, setSlot, escalarKgMN, aplicarRacaoLocal, setNome,
       undo, redo, podeDesfazer: hist.past.length > 0, podeRefazer: hist.future.length > 0,
       salvarDieta, carregarDieta, novaDieta, duplicarDieta, excluirDieta, renomearDieta,
       adicionarSlot, reordenarSlots, removerSlot, atualizarNomeNosSlots,

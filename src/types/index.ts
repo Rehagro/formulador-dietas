@@ -155,6 +155,17 @@ export interface SlotIngrediente {
    *  MS diferente). Quando ausente, usa o MS do alimento na biblioteca. Afeta
    *  kg MS e todo o aporte de nutrientes. Pode ser gravado na biblioteca ao salvar. */
   msOverride?: number | null;
+  /** Receita de ração editada SÓ para esta dieta (mesma lógica diet-local dos
+   *  outros overrides). Quando presente, a composição do slot é recalculada a
+   *  partir desta receita em vez da versão salva no banco. `alimentoNome` segue
+   *  apontando para a ração-base (nome exibido). Pode ser publicado no banco. */
+  racaoOverride?: RacaoOverride | null;
+}
+
+/** Receita de ração local da dieta (override do slot). */
+export interface RacaoOverride {
+  receita: IngredienteRacao[];          // insumos editados (alimento_nome + kg_d)
+  capacidade_misturador_kg: number;
 }
 
 export interface Dieta {

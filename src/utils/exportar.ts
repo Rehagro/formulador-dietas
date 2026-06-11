@@ -1,7 +1,7 @@
 import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
 import type { Dieta, Alimento } from '../types';
-import { calcularResultados, formatarValor } from './calculos';
+import { calcularResultados, formatarValor, resolverAlimentoDoSlot } from './calculos';
 import { getReferenciasLactacao, getStatus } from './referencias';
 
 // ── Paleta de cores ──────────────────────────────────────────────────────────
@@ -173,9 +173,9 @@ export async function exportarXLSX(dieta: Dieta, alimentos: Alimento[]): Promise
 
   const slots = dieta.slots.filter(s => s.alimentoNome && s.kgMN > 0);
   slots.forEach((s, idx) => {
-    const a = alimentos.find(x => x.nome === s.alimentoNome);
+    const a = resolverAlimentoDoSlot(s, alimentos);
     if (!a) return;
-    const kgMS = s.kgMN * a.ms;
+    const kgMS = s.kgMN * (s.msOverride ?? a.ms);
     const pct = resultado.totalKgMS > 0 ? ((kgMS / resultado.totalKgMS) * 100).toFixed(1) + '%' : '-';
     const r = ws1.addRow([s.alimentoNome, s.kgMN.toFixed(2), kgMS.toFixed(2), pct]);
     r.height = 15;

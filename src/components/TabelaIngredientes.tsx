@@ -1,9 +1,14 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, Fragment } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
-import { X, ChevronDown, Plus, GripVertical, Trash2, Wheat } from 'lucide-react';
-import type { SlotIngrediente, Alimento } from '../types';
+import { X, ChevronDown, ChevronRight, Plus, GripVertical, Trash2, Wheat, Edit, Save, AlertTriangle } from 'lucide-react';
+import type { SlotIngrediente, Alimento, IngredienteRacao, OrigemRacao } from '../types';
 import { useRacao } from '../context/RacaoContext';
+import type { RacaoEmConstrucao } from '../context/RacaoContext';
+import { resolverAlimentoDoSlot } from '../utils/calculos.ts';
+import { calcularRacao } from '../utils/calculosRacao.ts';
+import ModalSalvarRacao from './racao/ModalSalvarRacao';
+import ModalAdicionarIngrediente from './racao/ModalAdicionarIngrediente';
 
 interface Props {
   slots: SlotIngrediente[];
@@ -212,14 +217,234 @@ function TotalMSEditavel({ total, onEscalar }: { total: number; onEscalar: (fato
   );
 }
 
+/** % de um campo em fração 0-1 → string com 1 casa (≤3 casas em toda a tela). */
+const pctNut = (v: number | null | undefined): string =>
+  v == null || !isFinite(v) ? '—' : (v * 100).toFixed(1);
+
+/**
+ * Subnível expansível de uma ração na dieta (Demanda 1A). Mostra os insumos da
+ * receita com kg/d EDITÁVEL e características nutricionais. Editar um kg/d grava
+ * `racaoOverride` no slot (ração editada só nesta dieta) — recalcula a composição
+ * na hora. A receita base vem do override (se já editada) ou do `origem_racao`.
+ */
+function SubtabelaRacao({
+  slot, idx, alimentoEf, alimentos, onSlotChange, onEditarFormulador, onSalvarBanco,
+}: {
+  slot: SlotIngrediente;
+  idx: number;
+  alimentoEf: Alimento;
+  alimentos: Alimento[];
+  onSlotChange: (idx: number, partial: Partial<SlotIngrediente>) => void;
+  onEditarFormulador: (slot: SlotIngrediente, alimentoEf: Alimento) => void;
+  onSalvarBanco: (slot: SlotIngrediente, alimentoEf: Alimento) => void;
+}) {
+  const origem = alimentoEf.origem_racao!;
+  // Receita-base: override (se já editada nesta dieta) senão a do banco. Mantém
+  // só {alimento_nome, kg_d} — kg da batida volta ao proporcional na edição inline.
+  const receita: IngredienteRacao[] = (slot.racaoOverride?.receita ?? origem.receita)
+    .map(r => ({ alimento_nome: r.alimento_nome, kg_d: r.kg_d }));
+  const capacidade = slot.racaoOverride?.capacidade_misturador_kg ?? origem.capacidade_misturador_kg;
+  const calc = calcularRacao(receita, alimentos, capacidade);
+  const [modalAdd, setModalAdd] = useState(false);
+
+  const gravarReceita = (nova: IngredienteRacao[]) =>
+    onSlotChange(idx, { racaoOverride: { receita: nova, capacidade_misturador_kg: capacidade } });
+
+  const editarKg = (nome: string, v: number) =>
+    gravarReceita(receita.map(r => r.alimento_nome === nome ? { ...r, kg_d: v } : r));
+
+  const removerIngrediente = (nome: string) =>
+    gravarReceita(receita.filter(r => r.alimento_nome !== nome));
+
+  const adicionarIngrediente = (ing: IngredienteRacao) => {
+    gravarReceita([...receita, { alimento_nome: ing.alimento_nome, kg_d: ing.kg_d }]);
+    setModalAdd(false);
+  };
+
+  return (
+    <div className="bg-amber-50/40 border-y border-amber-100 px-3 py-2.5">
+      <div className="flex items-center justify-between gap-2 mb-2">
+        <span className="text-[11px] font-semibold text-amber-800 flex items-center gap-1.5">
+          <Wheat size={12} /> Insumos da ração — kg/d editável (só altera esta dieta)
+        </span>
+        <div className="flex items-center gap-1.5">
+          <button
+            onClick={() => onEditarFormulador(slot, alimentoEf)}
+            className="flex items-center gap-1 text-[11px] font-medium bg-white border border-amber-200 hover:bg-amber-100 text-amber-800 px-2 py-1 rounded"
+            title="Abrir no Formulador de Ração (incluir novos insumos, etc.)"
+          >
+            <Edit size={11} /> Editar no formulador
+          </button>
+          <button
+            onClick={() => onSalvarBanco(slot, alimentoEf)}
+            className="flex items-center gap-1 text-[11px] font-medium bg-emerald-600 hover:bg-emerald-700 text-white px-2 py-1 rounded"
+            title="Salvar no banco (sobrescrever ou gerar nova ração)"
+          >
+            <Save size={11} /> Salvar no banco…
+          </button>
+        </div>
+      </div>
+
+      <div className="bg-white border border-amber-100 rounded-lg overflow-hidden">
+        <table className="w-full text-[11px]">
+          <thead className="bg-amber-50 text-amber-800">
+            <tr>
+              <th className="text-left px-2 py-1.5 font-semibold">Ingrediente</th>
+              <th className="text-right px-2 py-1.5 font-semibold w-20">kg/d</th>
+              <th className="text-right px-2 py-1.5 font-semibold">% mistura</th>
+              <th className="text-right px-2 py-1.5 font-semibold">MS%</th>
+              <th className="text-right px-2 py-1.5 font-semibold">PB%</th>
+              <th className="text-right px-2 py-1.5 font-semibold">FDN%</th>
+              <th className="text-right px-2 py-1.5 font-semibold">Amido%</th>
+              <th className="text-right px-2 py-1.5 font-semibold">NDT%</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-amber-50">
+            {receita.map(r => {
+              const ic = calc.ingredientes.find(x => x.alimento.nome === r.alimento_nome);
+              const al = ic?.alimento ?? alimentos.find(x => x.nome === r.alimento_nome);
+              if (!al) {
+                return (
+                  <tr key={r.alimento_nome} className="bg-red-50">
+                    <td className="px-2 py-1.5 text-red-700">
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          onClick={() => removerIngrediente(r.alimento_nome)}
+                          className="flex-shrink-0 p-0.5 text-red-400 hover:text-red-600 hover:bg-red-100 rounded"
+                          title="Remover insumo da ração"
+                        >
+                          <Trash2 size={11} />
+                        </button>
+                        <AlertTriangle size={11} /> {r.alimento_nome} (não está no banco)
+                      </div>
+                    </td>
+                    <td colSpan={7} />
+                  </tr>
+                );
+              }
+              return (
+                <tr key={r.alimento_nome} className="hover:bg-amber-50/50">
+                  <td className="px-2 py-1 text-gray-800">
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        onClick={() => removerIngrediente(r.alimento_nome)}
+                        className="flex-shrink-0 p-0.5 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded"
+                        title="Remover insumo da ração"
+                      >
+                        <Trash2 size={11} />
+                      </button>
+                      <span className="truncate">{al.nome}</span>
+                    </div>
+                  </td>
+                  <td className="px-1 py-1">
+                    <div className="flex justify-end">
+                      <EditableNum
+                        value={r.kg_d}
+                        dec={3}
+                        onCommit={v => editarKg(r.alimento_nome, v)}
+                        className="w-16 text-right border border-amber-200 rounded px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-amber-400 tabular-nums font-semibold"
+                      />
+                    </div>
+                  </td>
+                  <td className="px-2 py-1 text-right tabular-nums">{ic ? (ic.fracao * 100).toFixed(1) : '0.0'}%</td>
+                  <td className="px-2 py-1 text-right tabular-nums text-gray-600">{pctNut(al.ms)}</td>
+                  <td className="px-2 py-1 text-right tabular-nums text-gray-600">{pctNut(al.pb)}</td>
+                  <td className="px-2 py-1 text-right tabular-nums text-gray-600">{pctNut(al.fdn)}</td>
+                  <td className="px-2 py-1 text-right tabular-nums text-gray-600">{pctNut(al.amido)}</td>
+                  <td className="px-2 py-1 text-right tabular-nums text-gray-600">{pctNut(al.ndt)}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+          <tfoot className="bg-amber-50/60 border-t border-amber-100 font-semibold text-amber-900">
+            <tr>
+              <td className="px-2 py-1">Ração (composição)</td>
+              <td className="px-2 py-1 text-right tabular-nums">{calc.consumo_total_kg_d.toFixed(3)}</td>
+              <td className="px-2 py-1 text-right tabular-nums">100%</td>
+              <td className="px-2 py-1 text-right tabular-nums">{pctNut(calc.composicao.ms)}</td>
+              <td className="px-2 py-1 text-right tabular-nums">{pctNut(calc.composicao.pb)}</td>
+              <td className="px-2 py-1 text-right tabular-nums">{pctNut(calc.composicao.fdn)}</td>
+              <td className="px-2 py-1 text-right tabular-nums">{pctNut(calc.composicao.amido)}</td>
+              <td className="px-2 py-1 text-right tabular-nums">{pctNut(calc.composicao.ndt)}</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+
+      <button
+        onClick={() => setModalAdd(true)}
+        className="mt-2 flex items-center gap-1.5 text-[11px] font-medium text-amber-800 bg-white border border-amber-200 hover:bg-amber-100 px-2.5 py-1.5 rounded-lg"
+      >
+        <Plus size={12} /> Adicionar insumo à ração
+      </button>
+
+      {modalAdd && (
+        <ModalAdicionarIngrediente
+          alimentos={alimentos}
+          jaAdicionados={receita.map(r => r.alimento_nome)}
+          onAdd={adicionarIngrediente}
+          onCancel={() => setModalAdd(false)}
+        />
+      )}
+    </div>
+  );
+}
+
 export default function TabelaIngredientes({ slots, alimentos, totalKgMS, onSlotChange, onAdicionarSlot, onReordenar, onRemoverSlot, onEscalar }: Props) {
   const [units, setUnits] = useState<Record<string, 'kg' | 'g'>>({});
   const [dragIdx, setDragIdx] = useState<number | null>(null);
   const [overIdx, setOverIdx] = useState<number | null>(null);
   const [selecionados, setSelecionados] = useState<Set<string>>(new Set());
+  const [expandido, setExpandido] = useState<Set<string>>(new Set());
+  // Slot cuja ração está com o modal "Salvar no banco" aberto (com receita+capacidade).
+  const [salvarBanco, setSalvarBanco] = useState<
+    { idx: number; nomeBase: string; receita: IngredienteRacao[]; capacidade: number; existeNoBanco: boolean } | null
+  >(null);
 
   const navigate = useNavigate();
-  const { iniciarComIngredientes } = useRacao();
+  const { iniciarComIngredientes, iniciarEdicao } = useRacao();
+
+  const toggleExpandido = (slotId: string) => {
+    setExpandido(prev => {
+      const novo = new Set(prev);
+      if (novo.has(slotId)) novo.delete(slotId); else novo.add(slotId);
+      return novo;
+    });
+  };
+
+  /** Receita + capacidade efetivas de um slot de ração (override ou banco). */
+  const receitaDoSlot = (slot: SlotIngrediente, alimentoEf: Alimento) => {
+    const origem = alimentoEf.origem_racao!;
+    const receita: IngredienteRacao[] = (slot.racaoOverride?.receita ?? origem.receita)
+      .map(r => ({ alimento_nome: r.alimento_nome, kg_d: r.kg_d }));
+    const capacidade = slot.racaoOverride?.capacidade_misturador_kg ?? origem.capacidade_misturador_kg;
+    return { receita, capacidade };
+  };
+
+  // 1B — reabre a ração (receita efetiva, incl. edições locais) no Formulador.
+  const editarNoFormulador = (slot: SlotIngrediente, alimentoEf: Alimento) => {
+    const { receita, capacidade } = receitaDoSlot(slot, alimentoEf);
+    const origem: OrigemRacao = {
+      data_criacao: alimentoEf.origem_racao!.data_criacao,
+      fazenda: alimentoEf.origem_racao!.fazenda,
+      capacidade_misturador_kg: capacidade,
+      receita,
+    };
+    iniciarEdicao(alimentoEf.nome, origem, slot.id);
+    navigate('/racao');
+  };
+
+  // Abre o modal "Salvar no banco" (sobrescrever / gerar nova) para a ração do slot.
+  const abrirSalvarBanco = (slot: SlotIngrediente, alimentoEf: Alimento, idx: number) => {
+    const { receita, capacidade } = receitaDoSlot(slot, alimentoEf);
+    setSalvarBanco({
+      idx,
+      nomeBase: alimentoEf.nome,
+      receita,
+      capacidade,
+      existeNoBanco: alimentos.some(a => a.nome === alimentoEf.nome),
+    });
+  };
 
   // Slots elegíveis: têm alimento e kgMN > 0
   const slotsElegiveis = slots.filter(s => s.alimentoNome && s.kgMN > 0);
@@ -234,9 +459,33 @@ export default function TabelaIngredientes({ slots, alimentos, totalKgMS, onSlot
   };
 
   const irParaFormuladorRacao = () => {
-    const ingredientes = slotsElegiveis
-      .filter(s => selecionados.has(s.id))
-      .map(s => ({ alimento_nome: s.alimentoNome!, kg_d: s.kgMN }));
+    const selSlots = slotsElegiveis.filter(s => selecionados.has(s.id));
+    if (selSlots.length === 0) return;
+
+    // Uma única ração selecionada → abre ela em modo edição (igual ao botão do
+    // subnível), com as opções de salvar (sobrescrever / nova / só nesta dieta).
+    if (selSlots.length === 1) {
+      const s = selSlots[0];
+      const a = resolverAlimentoDoSlot(s, alimentos);
+      if (a?.origem_racao) {
+        editarNoFormulador(s, a);
+        return;
+      }
+    }
+
+    // Caso geral → monta a mistura expandindo cada ração nos seus insumos
+    // (nunca leva a ração como ingrediente fechado).
+    const ingredientes: { alimento_nome: string; kg_d: number }[] = [];
+    for (const s of selSlots) {
+      const a = resolverAlimentoDoSlot(s, alimentos);
+      if (a?.origem_racao) {
+        for (const r of receitaDoSlot(s, a).receita) {
+          ingredientes.push({ alimento_nome: r.alimento_nome, kg_d: r.kg_d });
+        }
+      } else {
+        ingredientes.push({ alimento_nome: s.alimentoNome!, kg_d: s.kgMN });
+      }
+    }
     if (ingredientes.length === 0) return;
     iniciarComIngredientes(ingredientes);
     navigate('/racao');
@@ -281,19 +530,23 @@ export default function TabelaIngredientes({ slots, alimentos, totalKgMS, onSlot
           </thead>
           <tbody className="divide-y divide-gray-100">
             {slots.map((slot, idx) => {
-              const alimento = slot.alimentoNome ? alimentos.find(a => a.nome === slot.alimentoNome) : null;
+              // Resolve o alimento efetivo (inclui ração editada só nesta dieta).
+              const alimento = resolverAlimentoDoSlot(slot, alimentos) ?? null;
               // MS% efetivo: override desta dieta quando existir, senão o do banco
               const ms = slot.msOverride ?? (alimento?.ms ?? 0);
               const kgMS = alimento ? slot.kgMN * ms : 0;
 
               const unit = units[slot.id] ?? 'kg';
+              const isRacao = !!alimento?.origem_racao;
+              const editadaLocal = !!slot.racaoOverride;
+              const aberto = expandido.has(slot.id);
 
               const isDragging = dragIdx === idx;
               const isOver = overIdx === idx && dragIdx !== idx;
 
               return (
+                <Fragment key={slot.id}>
                 <tr
-                  key={slot.id}
                   draggable
                   onDragStart={e => { e.dataTransfer.effectAllowed = 'move'; setDragIdx(idx); }}
                   onDragOver={e => { e.preventDefault(); if (overIdx !== idx) setOverIdx(idx); }}
@@ -331,11 +584,29 @@ export default function TabelaIngredientes({ slots, alimentos, totalKgMS, onSlot
                     />
                   </td>
                   <td className="px-1 py-1">
-                    <AlimentoSelect
-                      value={slot.alimentoNome}
-                      alimentos={alimentos}
-                      onChange={nome => onSlotChange(idx, { alimentoNome: nome, kgMN: nome ? slot.kgMN : 0, custoOverride: null, msOverride: null })}
-                    />
+                    <div className="flex items-center gap-1">
+                      {isRacao ? (
+                        <button
+                          onClick={() => toggleExpandido(slot.id)}
+                          className="flex-shrink-0 p-0.5 text-amber-600 hover:bg-amber-100 rounded"
+                          title={aberto ? 'Recolher insumos da ração' : 'Ver/editar insumos da ração'}
+                        >
+                          {aberto ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                        </button>
+                      ) : null}
+                      <div className="flex-1 min-w-0">
+                        <AlimentoSelect
+                          value={slot.alimentoNome}
+                          alimentos={alimentos}
+                          onChange={nome => onSlotChange(idx, { alimentoNome: nome, kgMN: nome ? slot.kgMN : 0, custoOverride: null, msOverride: null, racaoOverride: null })}
+                        />
+                      </div>
+                    </div>
+                    {editadaLocal && (
+                      <span className="inline-flex items-center gap-1 mt-1 text-[9px] font-bold text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded">
+                        <Wheat size={9} /> editada nesta dieta
+                      </span>
+                    )}
                   </td>
                   <td className="px-1 py-1">
                     <div className="flex items-center justify-end gap-0.5">
@@ -416,6 +687,22 @@ export default function TabelaIngredientes({ slots, alimentos, totalKgMS, onSlot
                     )}
                   </td>
                 </tr>
+                {isRacao && aberto && alimento && (
+                  <tr>
+                    <td colSpan={8} className="p-0">
+                      <SubtabelaRacao
+                        slot={slot}
+                        idx={idx}
+                        alimentoEf={alimento}
+                        alimentos={alimentos}
+                        onSlotChange={onSlotChange}
+                        onEditarFormulador={editarNoFormulador}
+                        onSalvarBanco={(s, a) => abrirSalvarBanco(s, a, idx)}
+                      />
+                    </td>
+                  </tr>
+                )}
+                </Fragment>
               );
             })}
           </tbody>
@@ -447,6 +734,34 @@ export default function TabelaIngredientes({ slots, alimentos, totalKgMS, onSlot
           Adicionar alimento
         </button>
       </div>
+
+      {/* Modal Salvar no banco (sobrescrever / gerar nova) a partir do subnível */}
+      {salvarBanco && (() => {
+        const resultado = calcularRacao(salvarBanco.receita, alimentos, salvarBanco.capacidade);
+        const racaoConstr: RacaoEmConstrucao = {
+          nome: salvarBanco.nomeBase,
+          capacidade_misturador_kg: salvarBanco.capacidade,
+          ingredientes: salvarBanco.receita,
+          editando_nome: salvarBanco.existeNoBanco ? salvarBanco.nomeBase : undefined,
+        };
+        return (
+          <ModalSalvarRacao
+            racao={racaoConstr}
+            resultado={resultado}
+            onClose={() => setSalvarBanco(null)}
+            onSaved={nomeSalvo => {
+              // Sobrescreveu a ração-base → limpa o override (passa a ler do banco).
+              // Gerou nova → o slot passa a apontar para a nova ração (override limpo).
+              if (nomeSalvo === salvarBanco.nomeBase) {
+                onSlotChange(salvarBanco.idx, { racaoOverride: null });
+              } else {
+                onSlotChange(salvarBanco.idx, { alimentoNome: nomeSalvo, racaoOverride: null });
+              }
+              setSalvarBanco(null);
+            }}
+          />
+        );
+      })()}
     </div>
   );
 }

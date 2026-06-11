@@ -1,8 +1,38 @@
 import type { Alimento, AnimalLactacao, SlotIngrediente, ResultadoDieta } from '../types';
+import { calcularRacao, racaoParaAlimento } from './calculosRacao.ts';
 
 /** MS (fração 0-1) efetivo do slot: usa o override por dieta quando existir,
  *  senão o MS do alimento na biblioteca. (Ponto 4 — MS% editável) */
 const msEff = (slot: SlotIngrediente, a: Alimento): number => slot.msOverride ?? a.ms;
+
+/**
+ * Resolve o Alimento efetivo de um slot. Se o slot tem `racaoOverride` (ração
+ * editada só nesta dieta), recalcula o Alimento ad-hoc a partir da receita
+ * editada via `calcularRacao` + `racaoParaAlimento`; senão busca no banco.
+ *
+ * Cache (WeakMap pelo objeto override) evita recomputar a ração nos vários
+ * pontos que iteram slots. Invalida quando o banco (`alimentos`) muda de
+ * referência — assim editar um ingrediente do banco reflete na ração local.
+ */
+const _racaoCache = new WeakMap<object, { alimentos: Alimento[]; alimento: Alimento }>();
+export function resolverAlimentoDoSlot(
+  slot: SlotIngrediente, alimentos: Alimento[]
+): Alimento | undefined {
+  const ov = slot.racaoOverride;
+  if (ov) {
+    const hit = _racaoCache.get(ov);
+    if (hit && hit.alimentos === alimentos) return hit.alimento;
+    const res = calcularRacao(ov.receita, alimentos, ov.capacidade_misturador_kg);
+    const alimento = racaoParaAlimento(res, {
+      nome: slot.alimentoNome ?? 'Ração',
+      capacidade_misturador_kg: ov.capacidade_misturador_kg,
+      custo_kg: slot.custoOverride ?? undefined,
+    });
+    _racaoCache.set(ov, { alimentos, alimento });
+    return alimento;
+  }
+  return alimentos.find(x => x.nome === slot.alimentoNome);
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // PARÂMETROS RUMINAIS — NASEM 2021 por categoria animal
@@ -255,7 +285,7 @@ export function calcularResultados(
 
   for (const slot of slots) {
     if (!slot.alimentoNome || slot.kgMN <= 0) continue;
-    const a = alimentos.find(x => x.nome === slot.alimentoNome);
+    const a = resolverAlimentoDoSlot(slot, alimentos);
     if (!a) continue;
 
     const kgMN = slot.kgMN;
@@ -575,7 +605,7 @@ export function calcularResultados(
     let Dt_DigNDFIn_Base_kg = 0;
     for (const slot of slots) {
       if (!slot.alimentoNome || slot.kgMN <= 0) continue;
-      const a = alimentos.find(x => x.nome === slot.alimentoNome);
+      const a = resolverAlimentoDoSlot(slot, alimentos);
       if (!a || !a.fdn || a.fdn <= 0) continue;
       const kgMS_slot = slot.kgMN * msEff(slot, a);
       const Fd_dcNDF_base = calcularFdDcNDFBase(a, ndf_method);
@@ -595,7 +625,7 @@ export function calcularResultados(
     let Dt_DigStIn_Base = 0;
     for (const slot of slots) {
       if (!slot.alimentoNome || slot.kgMN <= 0) continue;
-      const a = alimentos.find(x => x.nome === slot.alimentoNome);
+      const a = resolverAlimentoDoSlot(slot, alimentos);
       if (!a || !a.amido) continue;
       const kgMS_slot = slot.kgMN * msEff(slot, a);
       const dcSt = (a.dc_st ?? 92) / 100;     // fração; default 92% (sem dado)
@@ -611,7 +641,7 @@ export function calcularResultados(
     //    Fd_dcFA per-feed se disponível; senão heurística por classe (Tabela 4-1).
     for (const slot of slots) {
       if (!slot.alimentoNome || slot.kgMN <= 0) continue;
-      const a = alimentos.find(x => x.nome === slot.alimentoNome);
+      const a = resolverAlimentoDoSlot(slot, alimentos);
       if (!a) continue;
       const kgMS_slot = slot.kgMN * msEff(slot, a);
       const fa_frac   = a.fa ?? ((a.ee ?? 0) * 0.80);
@@ -643,7 +673,7 @@ export function calcularResultados(
     let kgFA_fHydr = 0;
     for (const slot of slots) {
       if (!slot.alimentoNome || slot.kgMN <= 0) continue;
-      const a = alimentos.find(x => x.nome === slot.alimentoNome);
+      const a = resolverAlimentoDoSlot(slot, alimentos);
       if (!a) continue;
       const kgMS_slot = slot.kgMN * msEff(slot, a);
       const fa_frac   = a.fa ?? ((a.ee ?? 0) * 0.80);
