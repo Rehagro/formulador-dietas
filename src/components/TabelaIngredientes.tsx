@@ -19,6 +19,10 @@ interface Props {
   onReordenar: (de: number, para: number) => void;
   onRemoverSlot: (idx: number) => void;
   onEscalar: (fator: number) => void;
+  /** Comparação com a foto: quando true e slotsFoto presente, mostra colunas
+   *  read-only kg MN / kg MS / R$/kg da foto à esquerda de cada coluna atual. */
+  comparando?: boolean;
+  slotsFoto?: SlotIngrediente[] | null;
 }
 
 function AlimentoSelect({
@@ -221,6 +225,37 @@ function TotalMSEditavel({ total, onEscalar }: { total: number; onEscalar: (fato
 const pctNut = (v: number | null | undefined): string =>
   v == null || !isFinite(v) ? '—' : (v * 100).toFixed(1);
 
+/** Valores da foto (read-only) para um slot, casados por `id`. Null quando o
+ *  slot não existe na foto (ex.: adicionado depois) ou está vazio. */
+function fotoValoresDoSlot(
+  slot: SlotIngrediente, slotsFoto: SlotIngrediente[] | null | undefined, alimentos: Alimento[]
+): { kgMN: number; kgMS: number; custo: number | null } | null {
+  const sf = slotsFoto?.find(x => x.id === slot.id);
+  if (!sf || !sf.alimentoNome) return null;
+  const a = resolverAlimentoDoSlot(sf, alimentos);
+  if (!a) return null;
+  const ms = sf.msOverride ?? a.ms ?? 0;
+  return { kgMN: sf.kgMN, kgMS: sf.kgMN * ms, custo: sf.custoOverride ?? a.custo ?? null };
+}
+
+/** Célula read-only de valor da foto (fundo índigo, não editável). */
+function FotoTd({ texto }: { texto: string }) {
+  return (
+    <td className="px-1 py-1 bg-indigo-50/50">
+      <div className="text-right tabular-nums text-[11px] text-indigo-700 px-1.5">{texto}</div>
+    </td>
+  );
+}
+
+/** Cabeçalho de coluna-foto. */
+function FotoTh({ label }: { label: string }) {
+  return (
+    <th className="text-right px-2 py-2.5 font-semibold text-indigo-400 bg-indigo-50/40 whitespace-nowrap">
+      📷 {label}
+    </th>
+  );
+}
+
 /**
  * Subnível expansível de uma ração na dieta (Demanda 1A). Mostra os insumos da
  * receita com kg/d EDITÁVEL e características nutricionais. Editar um kg/d grava
@@ -390,7 +425,7 @@ function SubtabelaRacao({
   );
 }
 
-export default function TabelaIngredientes({ slots, alimentos, totalKgMS, onSlotChange, onAdicionarSlot, onReordenar, onRemoverSlot, onEscalar }: Props) {
+export default function TabelaIngredientes({ slots, alimentos, totalKgMS, onSlotChange, onAdicionarSlot, onReordenar, onRemoverSlot, onEscalar, comparando = false, slotsFoto = null }: Props) {
   const [units, setUnits] = useState<Record<string, 'kg' | 'g'>>({});
   const [dragIdx, setDragIdx] = useState<number | null>(null);
   const [overIdx, setOverIdx] = useState<number | null>(null);
@@ -445,6 +480,17 @@ export default function TabelaIngredientes({ slots, alimentos, totalKgMS, onSlot
       existeNoBanco: alimentos.some(a => a.nome === alimentoEf.nome),
     });
   };
+
+  // Comparação ativa só quando há foto carregada.
+  const cmp = comparando && !!slotsFoto;
+  const colCount = cmp ? 11 : 8;
+  // Totais da foto (kg MN e kg MS) — somatório dos slots fotografados.
+  const totalFotoKgMN = cmp
+    ? slots.reduce((s, sl) => s + (fotoValoresDoSlot(sl, slotsFoto, alimentos)?.kgMN ?? 0), 0)
+    : 0;
+  const totalFotoKgMS = cmp
+    ? slots.reduce((s, sl) => s + (fotoValoresDoSlot(sl, slotsFoto, alimentos)?.kgMS ?? 0), 0)
+    : 0;
 
   // Slots elegíveis: têm alimento e kgMN > 0
   const slotsElegiveis = slots.filter(s => s.alimentoNome && s.kgMN > 0);
@@ -522,9 +568,12 @@ export default function TabelaIngredientes({ slots, alimentos, totalKgMS, onSlot
                 <Wheat size={13} className="inline-block text-amber-600" />
               </th>
               <th className="text-left px-2 py-2.5 font-semibold text-gray-500 min-w-[140px]">Alimento</th>
+              {cmp && <FotoTh label="kg MN" />}
               <th className="text-right px-2 py-2.5 font-semibold text-gray-500">kg MN</th>
+              {cmp && <FotoTh label="kg MS" />}
               <th className="text-right px-2 py-2.5 font-semibold text-gray-500">kg MS</th>
               <th className="text-right px-2 py-2.5 font-semibold text-gray-500">MS %</th>
+              {cmp && <FotoTh label="R$/kg" />}
               <th className="text-right px-2 py-2.5 font-semibold text-gray-500">R$/kg</th>
             </tr>
           </thead>
@@ -535,6 +584,8 @@ export default function TabelaIngredientes({ slots, alimentos, totalKgMS, onSlot
               // MS% efetivo: override desta dieta quando existir, senão o do banco
               const ms = slot.msOverride ?? (alimento?.ms ?? 0);
               const kgMS = alimento ? slot.kgMN * ms : 0;
+              // Valores da foto deste slot (só quando comparando).
+              const fv = cmp ? fotoValoresDoSlot(slot, slotsFoto, alimentos) : null;
 
               const unit = units[slot.id] ?? 'kg';
               const isRacao = !!alimento?.origem_racao;
@@ -608,6 +659,7 @@ export default function TabelaIngredientes({ slots, alimentos, totalKgMS, onSlot
                       </span>
                     )}
                   </td>
+                  {cmp && <FotoTd texto={fv ? fv.kgMN.toFixed(2) : '—'} />}
                   <td className="px-1 py-1">
                     <div className="flex items-center justify-end gap-0.5">
                       <EditableNum
@@ -633,6 +685,7 @@ export default function TabelaIngredientes({ slots, alimentos, totalKgMS, onSlot
                       </button>
                     </div>
                   </td>
+                  {cmp && <FotoTd texto={fv ? fv.kgMS.toFixed(2) : '—'} />}
                   {/* kg MS editável — conta inversa via MS% efetivo (ponto 3) */}
                   <td className="px-1 py-1">
                     <div className="flex justify-end">
@@ -666,6 +719,7 @@ export default function TabelaIngredientes({ slots, alimentos, totalKgMS, onSlot
                       <div className="text-right text-gray-300">—</div>
                     )}
                   </td>
+                  {cmp && <FotoTd texto={fv && fv.custo != null ? fv.custo.toFixed(3) : '—'} />}
                   {/* R$/kg editável — override só desta dieta (ponto 4) */}
                   <td className="px-1 py-1">
                     {alimento ? (
@@ -689,7 +743,7 @@ export default function TabelaIngredientes({ slots, alimentos, totalKgMS, onSlot
                 </tr>
                 {isRacao && aberto && alimento && (
                   <tr>
-                    <td colSpan={8} className="p-0">
+                    <td colSpan={colCount} className="p-0">
                       <SubtabelaRacao
                         slot={slot}
                         idx={idx}
@@ -710,15 +764,25 @@ export default function TabelaIngredientes({ slots, alimentos, totalKgMS, onSlot
             <tr>
               <td />
               <td colSpan={3} className="px-3 py-2 text-gray-700">TOTAL</td>
+              {cmp && (
+                <td className="px-2 py-2 text-right tabular-nums text-indigo-700 text-[11px] bg-indigo-50/50">
+                  📷 {totalFotoKgMN.toFixed(2)}
+                </td>
+              )}
               <td className="px-2 py-2 text-right tabular-nums text-gray-800">
                 {slots.reduce((s, sl) => s + sl.kgMN, 0).toFixed(2)}
               </td>
+              {cmp && (
+                <td className="px-2 py-2 text-right tabular-nums text-indigo-700 text-[11px] bg-indigo-50/50">
+                  📷 {totalFotoKgMS.toFixed(2)}
+                </td>
+              )}
               <td className="px-1 py-2 text-right">
                 <div className="flex justify-end">
                   <TotalMSEditavel total={totalKgMS} onEscalar={onEscalar} />
                 </div>
               </td>
-              <td colSpan={2} />
+              <td colSpan={cmp ? 3 : 2} />
             </tr>
           </tfoot>
         </table>

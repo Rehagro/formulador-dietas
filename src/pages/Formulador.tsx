@@ -6,12 +6,13 @@ import ResumoDieta from '../components/ResumoDieta';
 import PainelNutrientes from '../components/PainelNutrientes';
 import TabelaIngredientes from '../components/TabelaIngredientes';
 import Indicadores from '../components/Indicadores';
+import FotoControles from '../components/FotoControles';
 import { calcularResultados } from '../utils/calculos';
 import { exportarXLSX } from '../utils/exportar';
 import { exportarPDF } from '../utils/exportarPDF';
 
 export default function Formulador() {
-  const { dieta, alimentos, setAnimal, setSlot, escalarKgMN, setNome, undo, redo, podeDesfazer, podeRefazer, salvarDieta, editarAlimento, novaDieta, adicionarSlot, reordenarSlots, removerSlot } = useDieta();
+  const { dieta, alimentos, setAnimal, setSlot, escalarKgMN, setNome, undo, redo, podeDesfazer, podeRefazer, salvarDieta, editarAlimento, novaDieta, adicionarSlot, reordenarSlots, removerSlot, tirarFoto, descartarFoto, voltarParaFoto, reaplicarFoto } = useDieta();
   const [salvando, setSalvando] = useState(false);
   const [exportandoXLSX, setExportandoXLSX] = useState(false);
   const [exportandoPDF, setExportandoPDF] = useState(false);
@@ -20,10 +21,30 @@ export default function Formulador() {
   const [toastMsg, setToastMsg] = useState('✅ Dieta salva com sucesso!');
   const [promptEdits, setPromptEdits] = useState<Map<string, { custo?: number; ms?: number }> | null>(null);
 
+  const [comparando, setComparando] = useState(false);
+
   const resultado = useMemo(
     () => calcularResultados(dieta.slots, alimentos, dieta.animal),
     [dieta.slots, dieta.animal, alimentos]
   );
+
+  // Predições da foto — recalculadas na hora pelo mesmo motor (nunca gravadas).
+  const resultadoFoto = useMemo(
+    () => dieta.foto
+      ? calcularResultados(dieta.foto.slots, alimentos, dieta.foto.animal)
+      : null,
+    [dieta.foto, alimentos]
+  );
+
+  // Sem foto, não há o que comparar — desliga o toggle.
+  useEffect(() => {
+    if (!dieta.foto) setComparando(false);
+  }, [dieta.foto]);
+
+  function handleTirarFoto() {
+    tirarFoto();
+    setComparando(true);   // ao tirar a foto, já liga a comparação
+  }
 
   function showToast(msg: string) {
     setToastMsg(msg);
@@ -251,10 +272,27 @@ export default function Formulador() {
       </div>
 
       {/* Resumo no topo — CMS, leite potencial, custos e barra de CMS */}
-      <ResumoDieta resultado={resultado} leite={dieta.animal.leite} precoLeite={dieta.animal.precoLeite} />
+      <ResumoDieta
+        resultado={resultado}
+        leite={dieta.animal.leite}
+        precoLeite={dieta.animal.precoLeite}
+        resultadoFoto={comparando ? resultadoFoto : null}
+      />
+
+      {/* Barra da Foto da Dieta — liga a comparação em todos os painéis */}
+      <FotoControles
+        temFoto={!!dieta.foto}
+        comparando={comparando}
+        criadaEm={dieta.foto?.criadaEm}
+        onTirarFoto={handleTirarFoto}
+        onToggleComparar={() => setComparando(c => !c)}
+        onVoltarParaFoto={voltarParaFoto}
+        onReaplicarFoto={reaplicarFoto}
+        onDescartarFoto={descartarFoto}
+      />
 
       {/* Layout principal: Animal | Ingredientes | Nutrientes lado a lado */}
-      <div className="grid grid-cols-1 xl:grid-cols-[270px_minmax(0,1.45fr)_minmax(0,0.9fr)] gap-4 items-start">
+      <div className="grid grid-cols-1 xl:grid-cols-[255px_minmax(0,1.7fr)_minmax(0,0.82fr)] gap-4 items-start">
         <PainelAnimal animal={dieta.animal} onChange={setAnimal} />
         <TabelaIngredientes
           slots={dieta.slots}
@@ -265,10 +303,12 @@ export default function Formulador() {
           onReordenar={reordenarSlots}
           onRemoverSlot={removerSlot}
           onEscalar={escalarKgMN}
+          comparando={comparando}
+          slotsFoto={dieta.foto?.slots ?? null}
         />
         <div className="flex flex-col gap-4">
-          <PainelNutrientes resultado={resultado} leite={dieta.animal.leite} />
-          <Indicadores resultado={resultado} />
+          <PainelNutrientes resultado={resultado} leite={dieta.animal.leite} resultadoFoto={comparando ? resultadoFoto : null} />
+          <Indicadores resultado={resultado} resultadoFoto={comparando ? resultadoFoto : null} />
         </div>
       </div>
     </div>

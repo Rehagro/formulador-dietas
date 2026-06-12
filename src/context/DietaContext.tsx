@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef, type ReactNode } from 'react';
 import type { User } from '@supabase/supabase-js';
-import type { Dieta, Alimento, SlotIngrediente, AnimalLactacao, RacaoOverride } from '../types';
+import type { Dieta, Alimento, SlotIngrediente, AnimalLactacao, RacaoOverride, FotoDieta } from '../types';
 import alimentosBase from '../data/alimentos.json';
 import {
   supabase,
@@ -82,6 +82,10 @@ interface DietaContextType {
   podeDesfazer: boolean;
   podeRefazer: boolean;
   salvarDieta: (nome: string) => Promise<void>;
+  tirarFoto: () => Promise<void>;
+  descartarFoto: () => Promise<void>;
+  voltarParaFoto: () => void;
+  reaplicarFoto: () => void;
   carregarDieta: (id: string) => void;
   novaDieta: () => void;
   duplicarDieta: (id: string) => void;
@@ -262,9 +266,49 @@ export function DietaProvider({ children }: { children: ReactNode }) {
     await saveDietaSupabase(atualizada);
   }, [dieta]);
 
+  // ── Foto da dieta (snapshot antes-depois) ────────────────────────────────
+  // tirarFoto/descartarFoto são CHECKPOINTS (mexem no present + persistem, sem
+  // criar passo de undo — igual a salvarDieta). voltarParaFoto/reaplicarFoto
+  // SÃO edições desfazíveis (passam por aplicarEdicao).
+  const tirarFoto = useCallback(async () => {
+    const foto: FotoDieta = {
+      slots: dieta.slots.map(s => ({ ...s })),
+      animal: { ...dieta.animal },
+      criadaEm: new Date().toISOString(),
+    };
+    const atualizada = { ...dieta, foto };
+    setHist(h => ({ ...h, present: atualizada }));
+    setDietas(prev => prev.map(d => d.id === atualizada.id ? atualizada : d));
+    await saveDietaSupabase(atualizada);
+  }, [dieta]);
+
+  const descartarFoto = useCallback(async () => {
+    const atualizada = { ...dieta, foto: null };
+    setHist(h => ({ ...h, present: atualizada }));
+    setDietas(prev => prev.map(d => d.id === atualizada.id ? atualizada : d));
+    await saveDietaSupabase(atualizada);
+  }, [dieta]);
+
+  // Restaura a receita+animal fotografados como dieta atual.
+  // voltarParaFoto: descarta a foto depois. reaplicarFoto: mantém a foto.
+  const restaurarFoto = useCallback((manterFoto: boolean) => {
+    aplicarEdicao(d => {
+      if (!d.foto) return d;
+      return {
+        ...d,
+        slots: d.foto.slots.map(s => ({ ...s })),
+        animal: { ...d.foto.animal },
+        foto: manterFoto ? d.foto : null,
+      };
+    });
+  }, [aplicarEdicao]);
+
+  const voltarParaFoto = useCallback(() => restaurarFoto(false), [restaurarFoto]);
+  const reaplicarFoto  = useCallback(() => restaurarFoto(true),  [restaurarFoto]);
+
   const carregarDieta = useCallback((id: string) => {
     const d = dietas.find(x => x.id === id);
-    if (d) resetHistorico({ ...d, animal: normalizarAnimal(d.animal), slots: normalizarSlots(d.slots) });
+    if (d) resetHistorico({ ...d, animal: normalizarAnimal(d.animal), slots: normalizarSlots(d.slots), foto: d.foto ?? null });
   }, [dietas, resetHistorico]);
 
   const novaDieta = useCallback(() => {
@@ -377,7 +421,8 @@ export function DietaProvider({ children }: { children: ReactNode }) {
       dieta, alimentos, dietas, carregando, usuario, logout,
       setAnimal, setSlot, escalarKgMN, aplicarRacaoLocal, setNome,
       undo, redo, podeDesfazer: hist.past.length > 0, podeRefazer: hist.future.length > 0,
-      salvarDieta, carregarDieta, novaDieta, duplicarDieta, excluirDieta, renomearDieta,
+      salvarDieta, tirarFoto, descartarFoto, voltarParaFoto, reaplicarFoto,
+      carregarDieta, novaDieta, duplicarDieta, excluirDieta, renomearDieta,
       adicionarSlot, reordenarSlots, removerSlot, atualizarNomeNosSlots,
       adicionarAlimento, editarAlimento, excluirAlimento,
     }}>

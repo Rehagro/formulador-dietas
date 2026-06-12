@@ -168,12 +168,24 @@ export interface RacaoOverride {
   capacidade_misturador_kg: number;
 }
 
+/** Snapshot ("foto") da dieta para comparação antes-depois.
+ *  Guarda apenas a RECEITA (slots) e o ANIMAL congelados — as predições são
+ *  recalculadas na hora pelo motor (calcularResultados), nunca gravadas. */
+export interface FotoDieta {
+  slots: SlotIngrediente[];
+  animal: AnimalLactacao;
+  criadaEm: string;   // ISO timestamp
+}
+
 export interface Dieta {
   id: string;
   nome: string;
   criadaEm: string;
   animal: AnimalLactacao;
   slots: SlotIngrediente[];
+  /** Foto (snapshot) para comparação antes-depois. Uma por dieta; tirar nova
+   *  substitui. Persiste dentro do próprio JSON da Dieta (sem tabela nova). */
+  foto?: FotoDieta | null;
 }
 
 export type StatusNutriente = 'ok' | 'alto' | 'baixo' | 'critico_alto' | 'critico_baixo' | 'sem_ref';

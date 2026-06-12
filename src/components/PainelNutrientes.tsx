@@ -7,6 +7,7 @@ import { formatarValor } from '../utils/calculos';
 interface Props {
   resultado: ResultadoDieta;
   leite: number;
+  resultadoFoto?: ResultadoDieta | null;
 }
 
 // Nutrientes que exibem 1 casa decimal (energia, proteína, fibra, gordura) —
@@ -18,8 +19,8 @@ const NUTRIENTES_1_CASA = new Set([
   'ee', 'ee_insat',
 ]);
 
-function NutrienteRow({ chave, valor, refs }: {
-  chave: string; valor: number; refs: Record<string, Referencia>;
+function NutrienteRow({ chave, valor, valorFoto, refs }: {
+  chave: string; valor: number; valorFoto?: number | null; refs: Record<string, Referencia>;
 }) {
   const ref = refs[chave];
   if (!ref) return null;
@@ -28,6 +29,7 @@ function NutrienteRow({ chave, valor, refs }: {
   const dot = statusDot(status);
   const casas = NUTRIENTES_1_CASA.has(chave) ? 1 : undefined;
   const valorFormatado = formatarValor(valor, ref.unidade, casas);
+  const fotoFormatado = valorFoto != null ? formatarValor(valorFoto, ref.unidade, casas) : null;
 
   // Faixa-recomendação (orientador pedagógico — mantida por pedido do usuário)
   const refStr = ref.ref !== undefined
@@ -41,18 +43,22 @@ function NutrienteRow({ chave, valor, refs }: {
     : '';
 
   return (
-    <div className={`flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-md ${color}`}>
-      <span className="text-xs font-semibold">{dot} {ref.label}</span>
-      <div className="text-right whitespace-nowrap">
-        <span className="text-sm font-bold tabular-nums">{valorFormatado}</span>
-        {refStr && <span className="text-[11px] ml-2 opacity-60">{refStr}</span>}
-      </div>
+    <div className={`flex items-center gap-2 px-2.5 py-1.5 rounded-md ${color}`}>
+      <span className="text-[13px] font-semibold flex-1 min-w-0 truncate">{dot} {ref.label}</span>
+      {fotoFormatado !== null && (
+        <span className="w-[58px] text-right text-base font-bold tabular-nums text-indigo-600" title="Valor da foto">
+          {fotoFormatado}
+        </span>
+      )}
+      <span className="w-[58px] text-right text-base font-bold tabular-nums">{valorFormatado}</span>
+      <span className="w-[72px] text-right text-xs opacity-60 leading-tight">{refStr}</span>
     </div>
   );
 }
 
-function Grupo({ titulo, chaves, resultado, refs, defaultOpen = false }: {
+function Grupo({ titulo, chaves, resultado, resultadoFoto, refs, defaultOpen = false }: {
   titulo: string; chaves: string[]; resultado: ResultadoDieta;
+  resultadoFoto?: ResultadoDieta | null;
   refs: Record<string, Referencia>; defaultOpen?: boolean;
 }) {
   const [open, setOpen] = useState(defaultOpen);
@@ -83,11 +89,20 @@ function Grupo({ titulo, chaves, resultado, refs, defaultOpen = false }: {
       </button>
       {open && (
         <div className="p-2 flex flex-col gap-1">
+          {resultadoFoto && (
+            <div className="flex items-center gap-2 px-2.5 pb-0.5">
+              <span className="flex-1 min-w-0" />
+              <span className="w-[58px] text-right text-[11px] font-bold uppercase text-indigo-500">📷 Foto</span>
+              <span className="w-[58px] text-right text-[11px] font-bold uppercase text-gray-500">Atual</span>
+              <span className="w-[72px]" />
+            </div>
+          )}
           {visiveis.map(k => (
             <NutrienteRow
               key={k}
               chave={k}
               valor={resultado[k as keyof ResultadoDieta] as number}
+              valorFoto={resultadoFoto ? (resultadoFoto[k as keyof ResultadoDieta] as number) : null}
               refs={refs}
             />
           ))}
@@ -113,7 +128,7 @@ const ABAS: Record<'nutrientes' | 'minerais', GrupoCfg[]> = {
   ],
 };
 
-export default function PainelNutrientes({ resultado, leite }: Props) {
+export default function PainelNutrientes({ resultado, leite, resultadoFoto }: Props) {
   const [aba, setAba] = useState<'nutrientes' | 'minerais'>('nutrientes');
   const refs = getReferenciasLactacao(leite);
 
@@ -136,7 +151,7 @@ export default function PainelNutrientes({ resultado, leite }: Props) {
       </div>
       <div className="p-2.5 flex flex-col gap-2">
         {ABAS[aba].map(g => (
-          <Grupo key={g.titulo} titulo={g.titulo} chaves={g.chaves} resultado={resultado} refs={refs} defaultOpen={g.defaultOpen} />
+          <Grupo key={g.titulo} titulo={g.titulo} chaves={g.chaves} resultado={resultado} resultadoFoto={resultadoFoto} refs={refs} defaultOpen={g.defaultOpen} />
         ))}
       </div>
     </div>
