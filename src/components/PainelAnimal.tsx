@@ -288,6 +288,33 @@ export default function PainelAnimal({ animal, onChange }: Props) {
           <option value="iv_all">Sim, em todos os alimentos</option>
         </select>
       </div>
+
+      {/* ── Monensina / ionóforo (NASEM 2021 Monensin_eqn — toggle binário) ── */}
+      <div className="mb-3 border border-sky-100 bg-sky-50/40 rounded-lg p-2.5">
+        <label className="text-xs font-bold text-sky-800 mb-1.5 flex items-center">
+          💊 Usa monensina (ionóforo) no lote?
+          <CampoTooltip texto={
+            "Marque Sim se a dieta inclui monensina/ionóforo (Rumensin e similares). " +
+            "Aumenta um pouco a energia disponível (eleva o leite potencial pela energia). " +
+            "É liga/desliga: o NASEM não considera a dose em mg/dia."
+          } />
+        </label>
+        <div className="flex gap-2">
+          {([false, true] as const).map(m => (
+            <button
+              key={String(m)}
+              onClick={() => onChange({ ...animal, usa_monensina: m })}
+              className={`flex-1 py-2 rounded-lg text-xs font-semibold border transition-colors ${
+                (animal.usa_monensina ?? false) === m
+                  ? 'bg-sky-600 text-white border-sky-600 shadow-sm'
+                  : 'bg-white text-gray-600 border-gray-200 hover:border-sky-400'
+              }`}
+            >
+              {m ? '💊 Sim' : 'Não'}
+            </button>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }

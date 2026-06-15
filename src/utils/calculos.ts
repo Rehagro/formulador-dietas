@@ -147,6 +147,80 @@ export function calcularFdDcNDFBase(
   return 0.50;   // fallback genérico
 }
 
+/**
+ * DE base por alimento (Mcal/kg MS) — NASEM 2021 `Fd_DE_base`
+ * (`nutrient_intakes.py:413-531`). É a DE "de tabela" que o NASEM Software
+ * exibe na ficha do alimento e que MUDA quando se altera dFDN 48h ou lignina.
+ *
+ * Recebe o alimento em formato de ARMAZENAMENTO (frações 0-1 para fdn/lignin/
+ * amido/ee/cinza/pb/pndr; dc_st/dc_fa em %; ivndfd48 em % do FDN; npn_frac e
+ * rup_digest em fração 0-1) — mesmas unidades que `calcularResultados` usa.
+ *
+ * Duas equações, escolhidas pelo mesmo switch do toggle (Use_DNDF_IV):
+ *   - lignina (Eq. base 1): energia da FDN via Van Soest (lignina).
+ *   - dFDN 48h (Eq. base 2): energia da FDN via (0,12 + 0,0061·dFDN48)·FDN.
+ * O resto dos termos (amido, AG, rOM, PB digestível, NPN) é idêntico.
+ *
+ * Casos especiais: Mineral/Aditivo → 0; Gordura/Óleo → equação de suplemento de FA.
+ */
+export function calcularFdDEBase(
+  a: Alimento,
+  method: NonNullable<AnimalLactacao['ndf_method']> = 'lignin'
+): number {
+  // % MS (NASEM trabalha em %, não fração)
+  const NDF   = (a.fdn    ?? 0) * 100;
+  const Lg    = (a.lignin ?? 0) * 100;
+  const St    = (a.amido  ?? 0) * 100;
+  const Ash   = (a.cinza  ?? 0) * 100;
+  const CP    = (a.pb     ?? 0) * 100;
+  const FA    = (a.fa ?? ((a.ee ?? 0) * 0.80)) * 100;
+  const dcSt  = a.dc_st ?? 92;                       // %
+  const dcFA  = a.dc_fa ?? 73;                       // %
+  const NPNCP = CP * (a.npn_frac ?? 0);              // % MS, escala CP
+  const RUP   = (a.pndr ?? 0) * 100;                 // % MS (proteína não-degradável = RUP)
+  const dcRUP = a.rup_digest ?? 0.70;                // fração
+
+  const classif = (a.classificacao ?? '').toLowerCase();
+  const isMineral = a.tipo === 'M';
+  const isFat = classif.includes('gordura') || classif.includes('óleo') || classif.includes('oleo');
+
+  // Mineral/Aditivo: sem energia (Vitamin/Mineral no NASEM → 0)
+  if (isMineral) return 0;
+
+  // Suplemento de gordura: NASEM "Fat Supplement"
+  if (isFat) {
+    return FA * dcFA / 100 * 0.094
+         + (100 - Ash - (FA / 1.06) * 0.96) * 0.043
+         - 0.318;
+  }
+
+  // Energia da FDN — lignina (base 1) ou dFDN 48h (base 2)
+  const useIV = method === 'iv_all' || (method === 'iv_forage' && a.tipo === 'F');
+  let ndfEnergy: number;
+  if (useIV && a.ivndfd48 != null) {
+    ndfEnergy = (0.12 + 0.0061 * a.ivndfd48) * NDF * 0.042;          // Eq. base 2
+  } else if (NDF > 0) {
+    const ratio = Math.min(0.999, Lg / NDF);
+    ndfEnergy = 0.75 * (NDF - Lg) * (1 - Math.pow(ratio, 0.667)) * 0.042; // Eq. base 1
+  } else {
+    ndfEnergy = 0;
+  }
+
+  // rOM: 96% digestível, 4,0 Mcal/kg (matéria orgânica residual)
+  const rOM = (100 - FA / 1.06 - Ash - NDF - St - (CP - (NPNCP - NPNCP / 2.81))) * 0.96 * 0.04;
+  // PB digestível: RDP + RUP digestível − NPN (5,65 Mcal/kg); NPN entra a 0,89
+  const digCP = ((CP - RUP) + RUP * dcRUP - NPNCP) * 0.0565;
+
+  const de = ndfEnergy
+           + St * dcSt / 100 * 0.0423
+           + FA * dcFA / 100 * 0.094
+           + rOM
+           + digCP
+           + NPNCP * 0.0089
+           - 0.318;                  // 0,137 + 0,093 + 0,088 (perdas fecais metabólicas)
+  return Math.max(0, de);
+}
+
 export function calcularNelAlimento(a: Alimento): number {
   if (a.nel !== null && a.nel > 0) return a.nel;
   if (a.ndt !== null) return (0.0245 * a.ndt * 100) - 0.12;
@@ -722,7 +796,14 @@ export function calcularResultados(
     const FA_pctMS    = (kgFA / totalKgMS) * 100;
     const dNDF_pctMS  = (Dt_DigNDFIn / totalKgMS) * 100;
     An_GasEOut  = 0.294 * totalKgMS - 0.347 * FA_pctMS + 0.0409 * dNDF_pctMS;
-    // Nota: redução de 5% se monensina presente (Eq. 20-310 nota) — não aplicada v1
+
+    // Monensina/ionóforo no lote (NASEM 2021 Monensin_eqn=1, toggle binário):
+    //   DE × 1,02 (nutrient_intakes.py:2219 / animal.py:319) e
+    //   energia de gás × 0,95 (animal.py:205). Ambos elevam a ME → leite-energia.
+    if (animal.usa_monensina) {
+      An_DEIn    *= 1.02;
+      An_GasEOut *= 0.95;
+    }
 
     // 9) ME (Eq. 20-307) e NEL (Eq. 20-223)
     An_MEIn = Math.max(0, An_DEIn - Ur_DEIn - An_GasEOut);

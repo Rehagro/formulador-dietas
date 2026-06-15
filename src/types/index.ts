@@ -141,6 +141,9 @@ export interface AnimalLactacao {
   dist_pasto_ordenha_km?: number;            // km, ida única até a ordenha
   n_ordenhas_dia?: number;                   // motor converte: trips = 2 × n_ordenhas
   topografia?: 'Mild' | 'Moderate' | 'Steep';// mapping motor: 0 / 100 / 300 m/d de subida
+  // Monensina/ionóforo no lote (NASEM 2021 Monensin_eqn — toggle binário, sem dose).
+  // Quando true: DE × 1,02 e energia de gás × 0,95 (eleva a ME → leite-energia).
+  usa_monensina?: boolean;
 }
 
 export interface SlotIngrediente {

@@ -2,6 +2,7 @@ import { useMemo, useState, type ReactNode } from 'react';
 import { X, Check, ChevronDown, ChevronUp, Lock, Info, FileText, Beaker } from 'lucide-react';
 import type { Alimento, LaudoMetadata } from '../../types';
 import { toDisplay, toStore, classificacoesDistintas, fmtLock, TIPO_LABEL, CAMPOS_FRACAO } from './utils';
+import { calcularFdDEBase } from '../../utils/calculos';
 
 interface Props {
   alimentoBase: Alimento;
@@ -78,20 +79,23 @@ function Grupo({ titulo, defaultOpen = false, badge, destaque, children }: Grupo
 }
 
 function CampoEdit({
-  label, valor, onChange, sufixo,
+  label, valor, onChange, sufixo, destaque, dica,
 }: {
   label: string;
   valor: number | string | null | undefined;
   onChange: (v: number | string | null) => void;
   sufixo?: string;
+  /** Destaca o campo (borda âmbar) — usado no dFDN 48h que dirige a DE base. */
+  destaque?: boolean;
+  dica?: string;
 }) {
   const [localStr, setLocalStr] = useState<string | null>(null);
   const display = localStr !== null ? localStr : (valor === null || valor === undefined ? '' : String(valor));
 
   return (
     <div className="flex flex-col gap-0.5">
-      <label className="text-[11px] font-medium text-gray-500">
-        {label}{sufixo && <span className="text-gray-400 font-normal"> {sufixo}</span>}
+      <label className={`text-[11px] font-medium flex items-center gap-1 ${destaque ? 'text-amber-700' : 'text-gray-500'}`} title={dica}>
+        {label}{sufixo && <span className={`font-normal ${destaque ? 'text-amber-500' : 'text-gray-400'}`}> {sufixo}</span>}
       </label>
       <input
         type="text"
@@ -111,7 +115,11 @@ function CampoEdit({
           const parsed = parseFloat(norm);
           if (!isNaN(parsed)) onChange(parsed);
         }}
-        className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm tabular-nums bg-white focus:outline-none focus:ring-2 focus:ring-green-500"
+        className={`w-full border rounded-lg px-2 py-1.5 text-sm tabular-nums bg-white focus:outline-none focus:ring-2 ${
+          destaque
+            ? 'border-amber-300 bg-amber-50/40 focus:ring-amber-500'
+            : 'border-gray-200 focus:ring-green-500'
+        }`}
       />
     </div>
   );
@@ -176,6 +184,18 @@ export default function ModalEdicaoAlimento({
   const [erroNome, setErroNome] = useState<string | null>(null);
   const [salvando, setSalvando] = useState(false);
 
+  // Método de cálculo da DE base na ficha (espelha o switch Use_DNDF_IV do NASEM).
+  // 'lignin' = pela lignina (Eq. base 1); 'iv' = pelo dFDN 48h (Eq. base 2).
+  const [metodoDE, setMetodoDE] = useState<'lignin' | 'iv'>('lignin');
+
+  // DE base calculada AO VIVO pela composição (Fd_DE_base NASEM) — responde a
+  // dFDN 48h / lignina / FDN, igual ao NASEM Software. toStore(form) reverte o
+  // form (em %) para o formato de armazenamento (frações) que a função espera.
+  const deCalc = useMemo(
+    () => calcularFdDEBase(toStore(form), metodoDE === 'iv' ? 'iv_all' : 'lignin'),
+    [form, metodoDE]
+  );
+
   const set = (key: keyof Alimento) => (v: unknown) =>
     setForm(f => ({ ...f, [key]: v }));
 
@@ -202,16 +222,12 @@ export default function ModalEdicaoAlimento({
     setErroNome(null);
     setSalvando(true);
     try {
-      // Frações proteicas vêm SEMPRE do alimento base (lock).
-      // Para IVNDFD48: se laudo trouxe (calculado da cinética), prevalece o laudo;
-      // senão, herda do template NASEM.
-      const ivndfd48Final = isLaudo && valoresLaudo?.ivndfd48 != null
-        ? valoresLaudo.ivndfd48
-        : (alimentoBase.ivndfd48 ?? null);
       // IMPORTANTE: os campos travados vêm do alimentoBase JÁ em formato de
       // armazenamento (frações 0-1 / valores crus). Eles são aplicados DEPOIS
       // do toStore(form) para não sofrerem a divisão por 100 dos CAMPOS_FRACAO.
       // (rup_digest ∈ CAMPOS_FRACAO; injetá-lo dentro do toStore zerava o campo.)
+      // dFDN 48h (ivndfd48) NÃO é mais travado — vem do form (editável) via toStore.
+      // DE base é recalculada (Fd_DE_base) a partir da composição final.
       const persistido: Alimento = {
         ...toStore(form),
         prot_a: alimentoBase.prot_a,
@@ -219,7 +235,7 @@ export default function ModalEdicaoAlimento({
         prot_c: alimentoBase.prot_c,
         kd_prot: alimentoBase.kd_prot,
         rup_digest: alimentoBase.rup_digest,
-        ivndfd48: ivndfd48Final,
+        de_base: +deCalc.toFixed(4),
         fonte_nasem: alimentoBase.fonte_nasem ?? null,
         alimento_base: isClone ? alimentoBase.nome : (form.alimento_base ?? null),
         origem_laudo: isLaudo ? metadataLaudo ?? null : (form.origem_laudo ?? null),
@@ -327,7 +343,31 @@ export default function ModalEdicaoAlimento({
               <CampoEdit label="PB"        sufixo="% MS"     valor={form.pb}       onChange={set('pb')} />
               <CampoEdit label="NDT"       sufixo="% MS"     valor={form.ndt}      onChange={set('ndt')} />
               <CampoEdit label="NEL"       sufixo="Mcal/kg"  valor={form.nel}      onChange={set('nel')} />
-              <CampoEdit label="DE base"   sufixo="Mcal/kg"  valor={form.de_base}  onChange={set('de_base')} />
+              {/* DE base CALCULADA (Fd_DE_base NASEM) — responde a dFDN 48h / lignina / FDN */}
+              <div className="flex flex-col gap-0.5">
+                <label className="text-[11px] font-medium text-emerald-700 flex items-center gap-1">
+                  DE base <span className="text-emerald-500 font-normal">Mcal/kg · calc</span>
+                </label>
+                <div className="w-full border border-emerald-200 bg-emerald-50/50 rounded-lg px-2 py-1.5 text-sm tabular-nums text-emerald-800 font-semibold">
+                  {deCalc.toFixed(3)}
+                </div>
+                <div className="flex gap-1 mt-0.5">
+                  {(['lignin', 'iv'] as const).map(m => (
+                    <button
+                      key={m}
+                      type="button"
+                      onClick={() => setMetodoDE(m)}
+                      className={`flex-1 text-[10px] py-0.5 rounded border transition-colors ${
+                        metodoDE === m
+                          ? 'bg-emerald-600 text-white border-emerald-600'
+                          : 'bg-white text-gray-500 border-gray-200 hover:border-emerald-400'
+                      }`}
+                    >
+                      {m === 'lignin' ? 'lignina' : 'dFDN 48h'}
+                    </button>
+                  ))}
+                </div>
+              </div>
               <CampoEdit label="EE"        sufixo="% MS"     valor={form.ee}       onChange={set('ee')} />
               <CampoEdit label="Cinza"     sufixo="% MS"     valor={form.cinza}    onChange={set('cinza')} />
               <CampoEdit label="Amido"     sufixo="% MS"     valor={form.amido}    onChange={set('amido')} />
@@ -343,6 +383,9 @@ export default function ModalEdicaoAlimento({
               <CampoEdit label="FDNF"      sufixo="% MS" valor={form.fdnf}     onChange={set('fdnf')} />
               <CampoEdit label="FDA"       sufixo="% MS" valor={form.fda}      onChange={set('fda')} />
               <CampoEdit label="Lignina"   sufixo="% MS" valor={form.lignin}   onChange={set('lignin')} />
+              <CampoEdit
+                label="dFDN 48h" sufixo="%FDN" valor={form.ivndfd48} onChange={set('ivndfd48')} destaque
+                dica="Digestibilidade in vitro da FDN em 48h (% do FDN). Dirige a DE base quando o método 'dFDN 48h' está ativo, igual ao NASEM." />
               <CampoEdit label="EE Insat"  sufixo="% MS" valor={form.ee_insat} onChange={set('ee_insat')} />
             </div>
           </Grupo>
@@ -362,7 +405,6 @@ export default function ModalEdicaoAlimento({
               <CampoLock label="Fração C"            sufixo="%PB"  valor={alimentoBase.prot_c} />
               <CampoLock label="Kd (Fração B)"       sufixo="%/h"  valor={alimentoBase.kd_prot} />
               <CampoLock label="Digest. intestinal RUP" sufixo="%" valor={alimentoBase.rup_digest !== null && alimentoBase.rup_digest !== undefined ? alimentoBase.rup_digest * 100 : null} />
-              <CampoLock label="dFDN 48h"            sufixo="%FDN" valor={alimentoBase.ivndfd48} />
               <CampoLock label="ADIP"                sufixo="% MS" valor={alimentoBase.adip !== null && alimentoBase.adip !== undefined ? alimentoBase.adip * 100 : null} />
               <CampoLock label="NDIP"                sufixo="% MS" valor={alimentoBase.ndip !== null && alimentoBase.ndip !== undefined ? alimentoBase.ndip * 100 : null} />
             </div>
