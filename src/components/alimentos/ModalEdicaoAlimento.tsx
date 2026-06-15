@@ -1,7 +1,8 @@
-import { useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { X, Check, ChevronDown, ChevronUp, Lock, Info, FileText, Beaker } from 'lucide-react';
 import type { Alimento, LaudoMetadata } from '../../types';
 import { toDisplay, toStore, classificacoesDistintas, fmtLock, TIPO_LABEL, CAMPOS_FRACAO } from './utils';
+import { calcularFdDEBase } from '../../utils/calculos';
 
 interface Props {
   alimentoBase: Alimento;
@@ -186,6 +187,22 @@ export default function ModalEdicaoAlimento({
   const set = (key: keyof Alimento) => (v: unknown) =>
     setForm(f => ({ ...f, [key]: v }));
 
+  // DE base recalcula AO VIVO (Fd_DE_base NASEM) quando a composição muda — em
+  // especial ao editar dFDN 48h / lignina / FDN. Método 'iv_forage' espelha o
+  // NASEM "Use for forages" (forragem usa dFDN 48h, concentrado usa lignina).
+  // É EDITÁVEL: digitar um valor sobrescreve; mexer na composição recalcula de novo.
+  // Pula a 1ª renderização para não sobrescrever o valor salvo ao só abrir a ficha.
+  const primeiraRenderDE = useRef(true);
+  useEffect(() => {
+    if (primeiraRenderDE.current) { primeiraRenderDE.current = false; return; }
+    setForm(f => {
+      const novo = +calcularFdDEBase(toStore(f), 'iv_forage').toFixed(3);
+      return f.de_base === novo ? f : { ...f, de_base: novo };
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form.fdn, form.lignin, form.ivndfd48, form.amido, form.ee, form.cinza,
+      form.pb, form.pndr, form.fa, form.dc_st, form.dc_fa, form.tipo, form.classificacao]);
+
   const classificacoes = useMemo(() => {
     const conjunto = new Set(classificacoesDistintas(alimentos));
     if (form.classificacao) conjunto.add(form.classificacao);
@@ -329,7 +346,9 @@ export default function ModalEdicaoAlimento({
               <CampoEdit label="PB"        sufixo="% MS"     valor={form.pb}       onChange={set('pb')} />
               <CampoEdit label="NDT"       sufixo="% MS"     valor={form.ndt}      onChange={set('ndt')} />
               <CampoEdit label="NEL"       sufixo="Mcal/kg"  valor={form.nel}      onChange={set('nel')} />
-              <CampoEdit label="DE base"   sufixo="Mcal/kg"  valor={form.de_base}  onChange={set('de_base')} />
+              <CampoEdit
+                label="DE base" sufixo="Mcal/kg" valor={form.de_base} onChange={set('de_base')}
+                dica="Recalcula sozinho ao mudar dFDN 48h / lignina / FDN (Fd_DE_base NASEM, modo forragens). Você pode digitar por cima; é só exibição (o motor calcula a energia da dieta direto do dFDN 48h)." />
               <CampoEdit label="EE"        sufixo="% MS"     valor={form.ee}       onChange={set('ee')} />
               <CampoEdit label="Cinza"     sufixo="% MS"     valor={form.cinza}    onChange={set('cinza')} />
               <CampoEdit label="Amido"     sufixo="% MS"     valor={form.amido}    onChange={set('amido')} />
