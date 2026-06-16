@@ -1,12 +1,13 @@
 import { Trash2 } from 'lucide-react';
 import type { RacaoEmConstrucao } from '../../context/RacaoContext';
-import type { IngredienteRacao } from '../../types';
 import type { ResultadoRacao } from '../../utils/calculosRacao';
 
 interface Props {
   racao: RacaoEmConstrucao;
   resultado: ResultadoRacao;
-  onChangeIngredientes: (ings: IngredienteRacao[]) => void;
+  /** Aplica um patch ao estado da ração (ingredientes e/ou capacidade) com uma
+   *  chave de coalescência para agrupar digitação num único passo de desfazer. */
+  onPatch: (patch: Partial<RacaoEmConstrucao>, coalesceKey?: string) => void;
 }
 
 function pct(v: number | null | undefined, casas = 1): string {
@@ -19,26 +20,35 @@ function num(v: number, casas = 2): string {
   return v.toFixed(casas);
 }
 
-export default function TabelaIngredientesRacao({ racao, resultado, onChangeIngredientes }: Props) {
+export default function TabelaIngredientesRacao({ racao, resultado, onPatch }: Props) {
   const c = resultado.composicao;
 
-  // Edições casam por nome (robusto a ingredientes faltantes/filtrados).
-  const patchIngrediente = (nome: string, patch: Partial<IngredienteRacao>) => {
-    onChangeIngredientes(
-      racao.ingredientes.map(ing => ing.alimento_nome === nome ? { ...ing, ...patch } : ing),
-    );
+  // Escala = kg da batida por kg/d. É o invariante das duas colunas: só muda
+  // quando o usuário edita a capacidade do misturador. Editar kg/d OU kg batida
+  // de um insumo mantém a escala e atualiza a outra coluna proporcionalmente.
+  const consumo = resultado.consumo_total_kg_d;
+  const escala = consumo > 0
+    ? resultado.kg_batida_total / consumo
+    : (racao.capacidade_misturador_kg > 0 ? racao.capacidade_misturador_kg : 1);
+
+  // Recalcula ingredientes + capacidade mantendo a escala congelada (o total da
+  // batida acompanha a soma dos kg/d).
+  const aplicarKgD = (nome: string, kg_d: number, coalesceKey: string) => {
+    const ings = racao.ingredientes.map(ing => ing.alimento_nome === nome ? { ...ing, kg_d } : ing);
+    const novoConsumo = ings.reduce((s, i) => s + (i.kg_d > 0 ? i.kg_d : 0), 0);
+    onPatch({ ingredientes: ings, capacidade_misturador_kg: novoConsumo * escala }, coalesceKey);
   };
 
   const onKgDChange = (nome: string, kg_d: number) =>
-    patchIngrediente(nome, { kg_d });
+    aplicarKgD(nome, kg_d, `kgd:${nome}`);
 
-  // Editar o kg da batida grava um override manual (ex: arredondar 61,5 → 62).
-  // Recalcula % e total. É limpo ao mudar a capacidade do misturador.
+  // Editar o kg da batida → recalcula o kg/d desse insumo (kg_d = kg_batida / escala),
+  // mantendo a escala. As duas colunas e o total ficam coerentes.
   const onKgBatidaChange = (nome: string, kg_batida: number) =>
-    patchIngrediente(nome, { kg_batida });
+    aplicarKgD(nome, escala > 0 ? kg_batida / escala : 0, `batida:${nome}`);
 
   const onRemove = (nome: string) =>
-    onChangeIngredientes(racao.ingredientes.filter(ing => ing.alimento_nome !== nome));
+    onPatch({ ingredientes: racao.ingredientes.filter(ing => ing.alimento_nome !== nome) });
 
   return (
     <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
@@ -69,8 +79,8 @@ export default function TabelaIngredientesRacao({ racao, resultado, onChangeIngr
                   <input
                     type="number"
                     min="0"
-                    step="0.1"
-                    value={ic.kg_d}
+                    step="0.01"
+                    value={parseFloat(ic.kg_d.toFixed(2))}
                     onChange={e => onKgDChange(ic.alimento.nome, Number(e.target.value) || 0)}
                     className="w-16 text-right tabular-nums bg-transparent border-b border-gray-200 focus:border-amber-500 focus:outline-none"
                   />

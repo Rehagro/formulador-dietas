@@ -1,6 +1,6 @@
 import { useMemo, useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowLeft, Plus, Save, FileDown, Wheat, CheckCircle2, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, Plus, Save, FileDown, Wheat, CheckCircle2, AlertTriangle, Undo2, Redo2 } from 'lucide-react';
 import { useRacao } from '../context/RacaoContext';
 import { useDieta } from '../context/DietaContext';
 import { calcularRacao } from '../utils/calculosRacao';
@@ -9,13 +9,37 @@ import TabelaIngredientesRacao from '../components/racao/TabelaIngredientesRacao
 import PainelMineraisRacao from '../components/racao/PainelMineraisRacao';
 import ModalAdicionarIngrediente from '../components/racao/ModalAdicionarIngrediente';
 import ModalSalvarRacao from '../components/racao/ModalSalvarRacao';
+import ModalAplicarNaDieta from '../components/racao/ModalAplicarNaDieta';
 
 export default function FormuladorRacao() {
-  const { racao, atualizar, limpar } = useRacao();
+  const { racao, atualizar, limpar, undo, redo, podeDesfazer, podeRefazer } = useRacao();
   const { alimentos } = useDieta();
   const [modalAdd, setModalAdd] = useState(false);
   const [modalSalvar, setModalSalvar] = useState(false);
+  const [modalAplicar, setModalAplicar] = useState(false);
   const [toastSucesso, setToastSucesso] = useState<string | null>(null);
+
+  // Atalhos: Ctrl/Cmd+Z desfaz, Ctrl/Cmd+Shift+Z e Ctrl+Y refazem (igual à Dieta).
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const meta = e.ctrlKey || e.metaKey;
+      if (!meta) return;
+      const k = e.key.toLowerCase();
+      if (k === 'z' && !e.shiftKey) {
+        if (!podeDesfazer) return;
+        e.preventDefault();
+        (document.activeElement as HTMLElement | null)?.blur?.();
+        undo();
+      } else if ((k === 'z' && e.shiftKey) || k === 'y') {
+        if (!podeRefazer) return;
+        e.preventDefault();
+        (document.activeElement as HTMLElement | null)?.blur?.();
+        redo();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [podeDesfazer, podeRefazer, undo, redo]);
 
   // Toast de sucesso some sozinho. NÃO navega para fora — o usuário continua
   // com a ração recém-salva na tela (pode salvar de novo e escolher sobrescrever).
@@ -65,6 +89,8 @@ export default function FormuladorRacao() {
   }
 
   const semIngredientes = racao.ingredientes.length === 0;
+  // Veio de slots de uma dieta → oferece "Aplicar na dieta" (colapsa em ração local).
+  const veioDaDieta = !!racao.origem_slot_ids?.length;
 
   // F5: confirm antes de limpar uma ração com conteúdo (evita perda acidental)
   const limparComConfirm = () => {
@@ -96,12 +122,32 @@ export default function FormuladorRacao() {
               Editando: {racao.editando_nome}
             </span>
           )}
-          <Link
-            to="/"
-            className="ml-auto flex items-center gap-1.5 text-xs text-gray-600 hover:text-gray-800"
-          >
-            <ArrowLeft size={14} /> Voltar para Dieta
-          </Link>
+          <div className="ml-auto flex items-center gap-2">
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => { (document.activeElement as HTMLElement | null)?.blur?.(); undo(); }}
+                disabled={!podeDesfazer}
+                title="Desfazer (Ctrl+Z)"
+                className="flex items-center justify-center w-8 h-8 rounded-lg text-sky-700 bg-sky-100 hover:bg-sky-200 active:scale-95 disabled:text-gray-300 disabled:bg-gray-50 disabled:cursor-not-allowed transition-all"
+              >
+                <Undo2 size={16} />
+              </button>
+              <button
+                onClick={() => { (document.activeElement as HTMLElement | null)?.blur?.(); redo(); }}
+                disabled={!podeRefazer}
+                title="Refazer (Ctrl+Shift+Z)"
+                className="flex items-center justify-center w-8 h-8 rounded-lg text-sky-700 bg-sky-100 hover:bg-sky-200 active:scale-95 disabled:text-gray-300 disabled:bg-gray-50 disabled:cursor-not-allowed transition-all"
+              >
+                <Redo2 size={16} />
+              </button>
+            </div>
+            <Link
+              to="/"
+              className="flex items-center gap-1.5 text-xs text-gray-600 hover:text-gray-800"
+            >
+              <ArrowLeft size={14} /> Voltar para Dieta
+            </Link>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-3">
@@ -110,7 +156,7 @@ export default function FormuladorRacao() {
             <input
               type="text"
               value={racao.fazenda ?? ''}
-              onChange={e => atualizar({ fazenda: e.target.value })}
+              onChange={e => atualizar({ fazenda: e.target.value }, 'fazenda')}
               placeholder="ex: Fazenda Boa Esperança"
               className="mt-0.5 w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
             />
@@ -120,33 +166,24 @@ export default function FormuladorRacao() {
             <input
               type="text"
               value={racao.nome ?? ''}
-              onChange={e => atualizar({ nome: e.target.value })}
+              onChange={e => atualizar({ nome: e.target.value }, 'nome')}
               placeholder="ex: Ração Lactação Alta"
               className="mt-0.5 w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
             />
           </label>
           <label className="text-xs">
-            <span className="text-gray-600 font-medium">Capacidade do misturador (kg)</span>
+            <span className="text-gray-600 font-medium">Capacidade do misturador (kg) = total da batida</span>
             <input
               type="number"
               min="1"
               step="10"
-              value={racao.capacidade_misturador_kg}
-              onChange={e => atualizar({
-                capacidade_misturador_kg: Number(e.target.value) || 0,
-                // Reseta os kg editados manualmente → volta ao proporcional da dieta.
-                ingredientes: racao.ingredientes.map(ing => ({
-                  alimento_nome: ing.alimento_nome, kg_d: ing.kg_d,
-                })),
-              })}
+              value={parseFloat(racao.capacidade_misturador_kg.toFixed(1))}
+              onChange={e => atualizar({ capacidade_misturador_kg: Number(e.target.value) || 0 }, 'cap')}
               className="mt-0.5 w-full border border-amber-300 rounded-lg px-2 py-1.5 text-sm font-bold tabular-nums focus:outline-none focus:ring-2 focus:ring-amber-400"
             />
-            {Math.abs(resultado.kg_batida_total - racao.capacidade_misturador_kg) > 0.5 && (
-              <span className="text-[11px] text-amber-700 mt-0.5 block">
-                Total real da batida: <strong>{resultado.kg_batida_total.toFixed(1)} kg</strong>{' '}
-                (ajustado pelos kg editados). Mude a capacidade para voltar ao proporcional.
-              </span>
-            )}
+            <span className="text-[11px] text-gray-400 mt-0.5 block">
+              Define o total da batida e reescalona os kg de cada insumo mantendo o kg/d.
+            </span>
           </label>
         </div>
       </div>
@@ -187,7 +224,7 @@ export default function FormuladorRacao() {
       <TabelaIngredientesRacao
         racao={racao}
         resultado={resultado}
-        onChangeIngredientes={ings => atualizar({ ingredientes: ings })}
+        onPatch={(patch, coalesceKey) => atualizar(patch, coalesceKey)}
       />
 
       <div className="flex justify-between flex-wrap gap-2">
@@ -239,10 +276,24 @@ export default function FormuladorRacao() {
         <button
           onClick={() => setModalSalvar(true)}
           disabled={resultado.ingredientes.length === 0 || resultado.kg_batida_total <= 0}
-          className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2 rounded-lg text-sm font-medium disabled:bg-gray-300 disabled:cursor-not-allowed"
+          className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium disabled:cursor-not-allowed ${
+            veioDaDieta
+              ? 'bg-gray-100 hover:bg-gray-200 text-gray-700 disabled:opacity-50'
+              : 'bg-emerald-600 hover:bg-emerald-700 text-white disabled:bg-gray-300'
+          }`}
         >
           <Save size={14} /> Salvar na biblioteca
         </button>
+        {veioDaDieta && (
+          <button
+            onClick={() => setModalAplicar(true)}
+            disabled={resultado.ingredientes.length === 0 || resultado.consumo_total_kg_d <= 0}
+            className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2 rounded-lg text-sm font-medium disabled:bg-gray-300 disabled:cursor-not-allowed"
+            title="Voltar para a dieta com estes insumos colapsados numa única ração"
+          >
+            <ArrowLeft size={14} /> Aplicar na dieta
+          </button>
+        )}
       </div>
 
       {modalAdd && (
@@ -269,6 +320,14 @@ export default function FormuladorRacao() {
             // continuar editando e, ao salvar de novo, escolher sobrescrever.
             atualizar({ nome, editando_nome: nome });
           }}
+        />
+      )}
+
+      {modalAplicar && (
+        <ModalAplicarNaDieta
+          racao={racao}
+          resultado={resultado}
+          onClose={() => setModalAplicar(false)}
         />
       )}
     </div>

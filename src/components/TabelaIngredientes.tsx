@@ -282,8 +282,13 @@ function SubtabelaRacao({
   const calc = calcularRacao(receita, alimentos, capacidade);
   const [modalAdd, setModalAdd] = useState(false);
 
+  // Grava a receita editada e mantém o kgMN da ração = soma dos kg/d (consumo
+  // total), para a dieta e a ração ficarem sempre coerentes.
   const gravarReceita = (nova: IngredienteRacao[]) =>
-    onSlotChange(idx, { racaoOverride: { receita: nova, capacidade_misturador_kg: capacidade } });
+    onSlotChange(idx, {
+      racaoOverride: { receita: nova, capacidade_misturador_kg: capacidade },
+      kgMN: nova.reduce((s, r) => s + (r.kg_d > 0 ? r.kg_d : 0), 0),
+    });
 
   const editarKg = (nome: string, v: number) =>
     gravarReceita(receita.map(r => r.alimento_nome === nome ? { ...r, kg_d: v } : r));
@@ -533,7 +538,7 @@ export default function TabelaIngredientes({ slots, alimentos, totalKgMS, onSlot
       }
     }
     if (ingredientes.length === 0) return;
-    iniciarComIngredientes(ingredientes);
+    iniciarComIngredientes(ingredientes, selSlots.map(s => s.id));
     navigate('/racao');
   };
 

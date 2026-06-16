@@ -115,7 +115,7 @@ export function calcularRacao(
       return [];
     }
     if (ing.kg_d <= 0) return [];
-    return [{ alimento: a, kg_d: ing.kg_d, kg_batida_manual: ing.kg_batida }];
+    return [{ alimento: a, kg_d: ing.kg_d }];
   });
 
   const consumo_total = resolvidos.reduce((s, r) => s + r.kg_d, 0);
@@ -133,16 +133,14 @@ export function calcularRacao(
     };
   }
 
-  // kg da batida por ingrediente: usa o override manual (ex: arredondado) quando
-  // existir; senão deriva proporcionalmente da capacidade. O TOTAL da batida e as
-  // proporções (% e composição) seguem esses kg efetivos — por isso editar 1 kg
-  // muda o total e os %. Mudar a capacidade limpa os overrides (volta ao proporcional).
-  const efetivos = resolvidos.map(r => {
-    const kg_batida = (r.kg_batida_manual != null && r.kg_batida_manual > 0)
-      ? r.kg_batida_manual
-      : (r.kg_d / consumo_total) * capacidade;
-    return { ...r, kg_batida };
-  });
+  // kg da batida por ingrediente = sempre proporcional ao kg/d (modelo de escala).
+  // A escala (= capacidade ÷ consumo_total) é a mesma para todos: editar o kg da
+  // batida de um insumo na UI recalcula o kg/d dele mantendo a escala, então as
+  // duas colunas ficam sempre coerentes e o total da batida = capacidade.
+  const efetivos = resolvidos.map(r => ({
+    ...r,
+    kg_batida: (r.kg_d / consumo_total) * capacidade,
+  }));
   const total_batida = efetivos.reduce((s, e) => s + e.kg_batida, 0);
 
   // Calcula proporção (pela batida) e custo por ingrediente

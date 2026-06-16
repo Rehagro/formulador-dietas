@@ -75,7 +75,7 @@ interface DietaContextType {
   setAnimal: (animal: AnimalLactacao) => void;
   setSlot: (idx: number, slot: Partial<SlotIngrediente>) => void;
   escalarKgMN: (fator: number) => void;
-  aplicarRacaoLocal: (slotId: string, override: RacaoOverride) => void;
+  colapsarEmRacao: (slotIds: string[], nome: string, override: RacaoOverride, kgMN: number) => void;
   setNome: (nome: string) => void;
   undo: () => void;
   redo: () => void;
@@ -236,13 +236,32 @@ export function DietaProvider({ children }: { children: ReactNode }) {
     aplicarEdicao(d => ({ ...d, nome }), 'nome');
   }, [aplicarEdicao]);
 
-  /** Grava uma ração editada só nesta dieta (racaoOverride) no slot de id dado.
-   *  Usado pelo "Salvar só nesta dieta" do Formulador de Ração. */
-  const aplicarRacaoLocal = useCallback((slotId: string, override: RacaoOverride) => {
-    aplicarEdicao(d => ({
-      ...d,
-      slots: d.slots.map(s => s.id === slotId ? { ...s, racaoOverride: override } : s),
-    }));
+  /** Colapsa um conjunto de slots (insumos crus e/ou rações) numa única linha de
+   *  ração local (racaoOverride) — sem tocar o banco. O primeiro slot da seleção
+   *  (na ordem atual) é reaproveitado: recebe o nome, a receita e kgMN = soma dos
+   *  kg/d (consumo total da ração); os demais slots da seleção são removidos.
+   *  Usado pelo "Aplicar na dieta" do Formulador de Ração. */
+  const colapsarEmRacao = useCallback((
+    slotIds: string[], nome: string, override: RacaoOverride, kgMN: number,
+  ) => {
+    aplicarEdicao(d => {
+      const idSet = new Set(slotIds);
+      const primeiro = d.slots.find(s => idSet.has(s.id));
+      if (!primeiro) return d;
+      const racaoSlot: SlotIngrediente = {
+        id: primeiro.id,
+        alimentoNome: nome,
+        kgMN,
+        racaoOverride: override,
+        custoOverride: null,
+        msOverride: null,
+      };
+      const slots = d.slots
+        .map(s => s.id === primeiro.id ? racaoSlot : s)
+        .filter(s => s.id === primeiro.id || !idSet.has(s.id));
+      while (slots.length < 4) slots.push({ id: gerarId(), alimentoNome: null, kgMN: 0 });
+      return { ...d, slots };
+    });
   }, [aplicarEdicao]);
 
   /** Escala o kgMN de todos os insumos preenchidos por um fator (ajuste único do
@@ -419,7 +438,7 @@ export function DietaProvider({ children }: { children: ReactNode }) {
   return (
     <DietaContext.Provider value={{
       dieta, alimentos, dietas, carregando, usuario, logout,
-      setAnimal, setSlot, escalarKgMN, aplicarRacaoLocal, setNome,
+      setAnimal, setSlot, escalarKgMN, colapsarEmRacao, setNome,
       undo, redo, podeDesfazer: hist.past.length > 0, podeRefazer: hist.future.length > 0,
       salvarDieta, tirarFoto, descartarFoto, voltarParaFoto, reaplicarFoto,
       carregarDieta, novaDieta, duplicarDieta, excluirDieta, renomearDieta,
