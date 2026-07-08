@@ -71,6 +71,51 @@ export const RUMEN_PARAMS = {
   // bezerro:    { ... },
 };
 
+/**
+ * RUP/RDP/idRUP de UM alimento via Eq. 6-1 completa (NASEM 2021).
+ * Fonte: nasem_dairy/nasem_equations/nutrient_intakes.py:319-381
+ *   Fd_RUPIn = (CPAIn − NPN_CPIn) × fCPAdu   ← fração A (6,4% escapa)
+ *            + CPBIn × kP/(kd + kP)          ← fração B (competição kP vs kd)
+ *            + CPCIn                          ← fração C (100% escapa)
+ *            + (IntRUP / refCPIn) × CPIn      ← intercepto da regressão
+ *
+ * Extraída para módulo porque o motor a chama POR INGREDIENTE (não pelo
+ * composto): rações são expandidas na sua receita antes de somar, já que a
+ * cadeia RUP→idRUP é NÃO-LINEAR em kd/rup_digest/tipo — ponderar essas médias
+ * e aplicar uma vez diverge do NASEM (que faz Σ Fd_RUPIn por alimento). Assim
+ * `leite-PM` fica idêntico com insumos soltos ou colapsados numa ração.
+ *
+ * @param kP_pct taxa de passagem em %/h (kPf p/ forragem, kPc p/ concentrado).
+ */
+function calcularRupRdpAlimento(
+  a: Alimento, kgMS: number, kP_pct: number, rp: RumenParams,
+): { rup: number; rdp: number; idRup: number } {
+  if (a.prot_a === null || a.prot_b === null || a.prot_c === null || a.kd_prot === null) {
+    if (a.pb > 0) console.warn(`[NASEM] Frações proteicas ausentes para "${a.nome}". RUP/RDP não calculados.`);
+    return { rup: 0, rdp: 0, idRup: 0 };
+  }
+  const kgCPIn = a.pb * kgMS;
+  const kgCPA  = kgCPIn * (a.prot_a / 100);
+  const kgCPB  = kgCPIn * (a.prot_b / 100);
+  const kgCPC  = kgCPIn * (a.prot_c / 100);
+  const kgNPN_in_feed = kgCPIn * (a.npn_frac ?? 0);  // NPN (todo na fração A)
+
+  const kgRUPA = Math.max(0, kgCPA - kgNPN_in_feed) * rp.fCPAdu;   // (1) fração A
+  const kgRUPB = kgCPB * (kP_pct / (a.kd_prot + kP_pct));          // (2) fração B
+  const kgRUPC = kgCPC;                                            // (3) fração C
+  const intRUP_term = (rp.IntRUP / rp.refCPIn) * kgCPIn;           // (4) intercepto
+
+  const rup = Math.max(0, kgRUPA + kgRUPB + kgRUPC + intRUP_term);
+  const rdp = Math.max(0, kgCPIn - rup);
+
+  // Digestibilidade intestinal do RUP (Eq. 20-123/124) — fallback 0,80
+  const dcRUP = a.rup_digest !== null
+    ? a.rup_digest
+    : (() => { console.warn(`[NASEM] rup_digest ausente para "${a.nome}". Usando fallback 0.80.`); return 0.80; })();
+
+  return { rup, rdp, idRup: rup * dcRUP };
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // COMPOSIÇÃO CORPORAL — NASEM 2021 (Eq. 20-247 a 20-270 e Tabela 20-11)
 // Constantes do `coeff_dict` oficial nasem_dairy.
@@ -375,51 +420,41 @@ export function calcularResultados(
     const nel = calcularNelAlimento(a);
     const cnf = calcularCNFAlimento(a);
 
-    // ── NASEM 2021 — RUP/RDP via Eq. 6-1 completa ──────────────────────────
-    // Fonte: nasem_dairy/nasem_equations/nutrient_intakes.py:319-381
-    //   Fd_RUPIn = (CPAIn − NPN_CPIn) × fCPAdu          ← fração A (6,4% escapa)
-    //            + CPBIn × kP/(kd + kP)                  ← fração B (competição)
-    //            + CPCIn                                  ← fração C (100%)
-    //            + (IntRUP / refCPIn) × CPIn             ← intercepto da regressão
-    // kP em %/h: kPf/kPc retornam decimal (4,87%/h → 0,0487) → × 100
-    const kP_pct = (a.tipo === 'F' ? kPf : kPc) * 100;  // %/h
+    // ── NASEM 2021 — RUP/RDP via Eq. 6-1 (ver `calcularRupRdpAlimento`) ────
+    // A cadeia RUP→idRUP é NÃO-LINEAR em kd/rup_digest/tipo. Se o slot é uma
+    // ração (composto com `origem_racao`), EXPANDIMOS a receita e somamos o RUP
+    // POR INGREDIENTE — igual ao NASEM (Σ Fd_RUPIn) e ao que dá com os insumos
+    // soltos. Colapsar em um único alimento médio deslocava o `leite-PM`.
+    // kP em %/h: kPf/kPc retornam decimal (4,87%/h → 0,0487) → × 100.
     const rp = RUMEN_PARAMS.lactacao;
+    const kP_de = (tipo: Alimento['tipo']) => (tipo === 'F' ? kPf : kPc) * 100;
     let kgRUP_f = 0;
     let kgRDP_f = 0;
     let idRUP_f = 0;
 
-    if (a.prot_a !== null && a.prot_b !== null && a.prot_c !== null && a.kd_prot !== null) {
-      const fracA = a.prot_a / 100;
-      const fracB = a.prot_b / 100;
-      const fracC = a.prot_c / 100;
-      const kd    = a.kd_prot;  // %/h
-
-      const kgCPIn  = a.pb * kgMS;
-      const kgCPA   = kgCPIn * fracA;
-      const kgCPB   = kgCPIn * fracB;
-      const kgCPC   = kgCPIn * fracC;
-      const kgNPN_in_feed = kgCPIn * (a.npn_frac ?? 0);  // NPN (todo na fração A)
-
-      // (1) Fração A — escapa fCPAdu × (CPA − NPN)
-      const kgRUPA = Math.max(0, kgCPA - kgNPN_in_feed) * rp.fCPAdu;
-      // (2) Fração B — competição kP vs kd
-      const kgRUPB = kgCPB * (kP_pct / (kd + kP_pct));
-      // (3) Fração C — 100% escapa
-      const kgRUPC = kgCPC;
-      // (4) Intercepto da regressão (negativo para CP típica)
-      const intRUP_term = (rp.IntRUP / rp.refCPIn) * kgCPIn;
-
-      kgRUP_f = Math.max(0, kgRUPA + kgRUPB + kgRUPC + intRUP_term);
-      kgRDP_f = Math.max(0, kgCPIn - kgRUP_f);
-
-      // Digestibilidade intestinal do RUP (Eq. 20-123/124) — fallback 0,80
-      const dcRUP = a.rup_digest !== null
-        ? a.rup_digest
-        : (() => { console.warn(`[NASEM] rup_digest ausente para "${a.nome}". Usando fallback 0.80.`); return 0.80; })();
-
-      idRUP_f = kgRUP_f * dcRUP;
-    } else if (a.pb > 0) {
-      console.warn(`[NASEM] Frações proteicas ausentes para "${a.nome}". RUP/RDP não calculados.`);
+    const receitaRacao = a.origem_racao?.receita;
+    if (receitaRacao && receitaRacao.length > 0) {
+      // Fração por MS de cada ingrediente na receita → rateia o kgMS efetivo do
+      // slot (que já respeita msOverride). Σ das parcelas = kgMS do slot.
+      const parcelas = receitaRacao
+        .map(r => ({ ai: alimentos.find(x => x.nome === r.alimento_nome), kg_d: r.kg_d }))
+        .filter((p): p is { ai: Alimento; kg_d: number } => !!p.ai)
+        .map(p => ({ ai: p.ai, dm: p.kg_d * p.ai.ms }));
+      const somaDM = parcelas.reduce((s, p) => s + p.dm, 0);
+      if (somaDM > 0) {
+        for (const p of parcelas) {
+          const kgMS_i = (p.dm / somaDM) * kgMS;
+          const r = calcularRupRdpAlimento(p.ai, kgMS_i, kP_de(p.ai.tipo), rp);
+          kgRUP_f += r.rup;
+          kgRDP_f += r.rdp;
+          idRUP_f += r.idRup;
+        }
+      }
+    } else {
+      const r = calcularRupRdpAlimento(a, kgMS, kP_de(a.tipo), rp);
+      kgRUP_f = r.rup;
+      kgRDP_f = r.rdp;
+      idRUP_f = r.idRup;
     }
 
     An_idRUPIn += idRUP_f;
