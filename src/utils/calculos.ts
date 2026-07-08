@@ -463,13 +463,21 @@ export function calcularResultados(
     let kgRDP_f = 0;
     let idRUP_f = 0;
 
-    for (const f of feedsEfetivosDoSlot(a, kgMS, alimentos)) {
+    // Alimentos efetivos do slot (ração → seus ingredientes; senão o próprio).
+    // Reusado para RUP/NPN e para os agregados dependentes de `tipo` (FDN
+    // forragem, MS forragem/úmida) — um insumo forrageiro DENTRO de uma ração
+    // (composto tipo 'C') precisa contar como forragem, senão a proteína
+    // microbiana (Rum_dcNDF/dcSt via ForNDF/ForWet) diverge dos insumos soltos.
+    const feeds = feedsEfetivosDoSlot(a, kgMS, alimentos);
+    for (const f of feeds) {
       const r = calcularRupRdpAlimento(f.a, f.kgMS, kP_de(f.a.tipo), rp);
       kgRUP_f += r.rup;
       kgRDP_f += r.rdp;
       idRUP_f += r.idRup;
       // NPN: Ureia e Cloreto de Amônio têm npn_frac=1.0; demais ~0
       kgNPN_CP += (f.a.pb ?? 0) * (f.a.npn_frac ?? 0) * f.kgMS;
+      // FDN de forragem (por ingrediente, respeitando o tipo real)
+      kgFDNF += f.a.tipo === 'F' ? (f.a.fdn ?? 0) * f.kgMS : 0;
     }
 
     An_idRUPIn += idRUP_f;
@@ -480,7 +488,6 @@ export function calcularResultados(
     kgPNDR += kgRUP_f;
     kgFDN += (a.fdn ?? 0) * kgMS;
     kgEFDN += calcularEFDNAlimento(a, kgMS);
-    kgFDNF += a.tipo === 'F' ? (a.fdn ?? 0) * kgMS : 0;
     kgFDA += (a.fda ?? 0) * kgMS;
     kgNEL += nel * kgMS;
     kgNDT += (a.ndt ?? 0) * kgMS;
@@ -527,11 +534,15 @@ export function calcularResultados(
     kgLEVEDURA += (a.levedura ?? 0) * kgMS;
     kgFDN8 += calcularFDN8(a, kgMS);
 
-    if (a.tipo === 'F') {
-      kgMS_forragem += kgMS;
+    // MS de forragem (total e úmida) por ingrediente — capta forragens dentro
+    // de uma ração. `slot.msOverride ?? f.a.ms` = MS efetiva (override é nível
+    // de slot e nulo em rações → cai no ms do ingrediente).
+    for (const f of feeds) {
+      if (f.a.tipo !== 'F') continue;
+      kgMS_forragem += f.kgMS;
       // Dt_ForWet NASEM (nutrient_intakes.py:128-131): só conta forragem com
-      // DM<71% E For>50%. Como a.tipo='F' implica For=100%, basta checar DM.
-      if (msEff(slot, a) < 0.71) kgMS_ForWet += kgMS;
+      // DM<71% E For>50%. Como tipo='F' implica For=100%, basta checar DM.
+      if ((slot.msOverride ?? f.a.ms) < 0.71) kgMS_ForWet += f.kgMS;
     }
   }
 

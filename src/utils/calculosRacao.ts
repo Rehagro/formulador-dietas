@@ -164,15 +164,45 @@ export function calcularRacao(
     ic.pct_custo = custo_total > 0 ? ic.custo_batida / custo_total : 0;
   });
 
-  // Composição ponderada (% MS) — média ponderada por fração na mistura
+  // Composição ponderada — cada campo na SUA base física, para que o composto
+  // represente de fato a mistura (e os totais da dieta batam com os insumos
+  // soltos, já que o motor multiplica cada campo por kgMS):
+  //   'mn'  = matéria natural  → só `ms` (MS da mistura = média as-fed)
+  //   'ms'  = matéria seca     → DEFAULT (campos por kg MS: pb, fdn, minerais…)
+  //   'cp'  = proteína bruta   → frações proteicas (% da CP)
+  //   'st'  = amido            → dc_st ; 'fa' = ác. graxos → dc_fa
+  //   'ndf' = FDN              → ivndfd48 (dFDN 48h, % da FDN)
+  // Antes tudo era ponderado por MN (`ic.fracao`), o que deixava os campos %MS
+  // ~0,04% fora do valor real da mistura (amplificado por NPN/ureia).
+  const BASE_POR_CAMPO: Partial<Record<keyof Composicao, 'mn' | 'cp' | 'st' | 'fa' | 'ndf'>> = {
+    ms: 'mn',
+    prot_a: 'cp', prot_b: 'cp', prot_c: 'cp',
+    soluble_protein: 'cp', npn_frac: 'cp', kd_prot: 'cp', rup_digest: 'cp',
+    dc_st: 'st', dc_fa: 'fa', ivndfd48: 'ndf',
+  };
+  const wMN  = ingredientesCalc.map(ic => ic.fracao);                        // as-fed
+  const wMS  = ingredientesCalc.map((ic, i) => wMN[i] * (ic.alimento.ms ?? 0));
+  const wCP  = ingredientesCalc.map((ic, i) => wMS[i] * (ic.alimento.pb ?? 0));
+  const wST  = ingredientesCalc.map((ic, i) => wMS[i] * (ic.alimento.amido ?? 0));
+  const wFA  = ingredientesCalc.map((ic, i) => wMS[i] * (ic.alimento.fa ?? ((ic.alimento.ee ?? 0) * 0.80)));
+  const wNDF = ingredientesCalc.map((ic, i) => wMS[i] * (ic.alimento.fdn ?? 0));
+  const pesos = { mn: wMN, ms: wMS, cp: wCP, st: wST, fa: wFA, ndf: wNDF };
+  const somas = Object.fromEntries(
+    Object.entries(pesos).map(([b, w]) => [b, w.reduce((s, x) => s + x, 0)]),
+  ) as Record<keyof typeof pesos, number>;
+
   const composicao = inicializarComposicao();
-  for (const ic of ingredientesCalc) {
-    for (const k of CAMPOS_PONDERADOS) {
+  for (const k of CAMPOS_PONDERADOS) {
+    const base = BASE_POR_CAMPO[k] ?? 'ms';
+    const soma = somas[base];
+    if (soma <= 0) continue;
+    const w = pesos[base];
+    let acc = 0;
+    ingredientesCalc.forEach((ic, i) => {
       const v = (ic.alimento as unknown as Record<string, number | null | undefined>)[k];
-      if (v != null && !isNaN(v)) {
-        composicao[k] += v * ic.fracao;
-      }
-    }
+      if (v != null && !isNaN(v)) acc += v * (w[i] / soma);
+    });
+    composicao[k] = acc;
   }
 
   return {
