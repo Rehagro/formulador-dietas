@@ -116,6 +116,34 @@ function calcularRupRdpAlimento(
   return { rup, rdp, idRup: rup * dcRUP };
 }
 
+/**
+ * Expande um slot nos seus alimentos "efetivos" para os cálculos NÃO-LINEARES
+ * por alimento (RUP, downgrade de NPN, digestibilidades dc_st/dc_fa/dcNDF).
+ *
+ * - Slot normal → `[{ a, kgMS }]` (o próprio alimento).
+ * - Slot de ração (`a.origem_racao.receita`) → uma entrada por ingrediente da
+ *   receita, com o kgMS do slot rateado pela fração de MS de cada insumo. A
+ *   soma das parcelas = kgMS do slot (bate com os termos lineares que usam o
+ *   composto). Assim `leite-PM`/`leite-NEL` ficam idênticos com insumos soltos
+ *   ou colapsados numa ração (NASEM soma por alimento: Σ Fd_*In).
+ *
+ * Ingredientes faltantes no banco são ignorados — coerente com `calcularRacao`,
+ * que já os exclui do composto. Se a receita não resolver, cai no composto.
+ */
+function feedsEfetivosDoSlot(
+  a: Alimento, kgMS: number, alimentos: Alimento[],
+): { a: Alimento; kgMS: number }[] {
+  const receita = a.origem_racao?.receita;
+  if (!receita || receita.length === 0) return [{ a, kgMS }];
+  const parcelas = receita
+    .map(r => ({ ai: alimentos.find(x => x.nome === r.alimento_nome), kg_d: r.kg_d }))
+    .filter((p): p is { ai: Alimento; kg_d: number } => !!p.ai)
+    .map(p => ({ a: p.ai, dm: p.kg_d * p.ai.ms }));
+  const somaDM = parcelas.reduce((s, p) => s + p.dm, 0);
+  if (somaDM <= 0) return [{ a, kgMS }];
+  return parcelas.map(p => ({ a: p.a, kgMS: (p.dm / somaDM) * kgMS }));
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // COMPOSIÇÃO CORPORAL — NASEM 2021 (Eq. 20-247 a 20-270 e Tabela 20-11)
 // Constantes do `coeff_dict` oficial nasem_dairy.
@@ -420,11 +448,14 @@ export function calcularResultados(
     const nel = calcularNelAlimento(a);
     const cnf = calcularCNFAlimento(a);
 
-    // ── NASEM 2021 — RUP/RDP via Eq. 6-1 (ver `calcularRupRdpAlimento`) ────
-    // A cadeia RUP→idRUP é NÃO-LINEAR em kd/rup_digest/tipo. Se o slot é uma
-    // ração (composto com `origem_racao`), EXPANDIMOS a receita e somamos o RUP
-    // POR INGREDIENTE — igual ao NASEM (Σ Fd_RUPIn) e ao que dá com os insumos
-    // soltos. Colapsar em um único alimento médio deslocava o `leite-PM`.
+    // ── NASEM 2021 — termos NÃO-LINEARES por alimento (RUP/RDP e downgrade NPN)
+    // A cadeia RUP→idRUP (Eq. 6-1) é não-linear em kd/rup_digest/tipo, e o
+    // downgrade energético do NPN usa o produto pb×npn_frac — também não-linear.
+    // Se o slot é uma ração, EXPANDIMOS a receita e somamos POR INGREDIENTE
+    // (igual ao NASEM: Σ Fd_*In, e ao que dá com os insumos soltos). Colapsar
+    // num único alimento médio deslocava `leite-PM` (proteína) e, com NPN/ureia
+    // na ração, também `leite-NEL` (energia). Os termos LINEARES abaixo seguem
+    // usando o composto `a` (a agregação preserva massa → resultado idêntico).
     // kP em %/h: kPf/kPc retornam decimal (4,87%/h → 0,0487) → × 100.
     const rp = RUMEN_PARAMS.lactacao;
     const kP_de = (tipo: Alimento['tipo']) => (tipo === 'F' ? kPf : kPc) * 100;
@@ -432,29 +463,13 @@ export function calcularResultados(
     let kgRDP_f = 0;
     let idRUP_f = 0;
 
-    const receitaRacao = a.origem_racao?.receita;
-    if (receitaRacao && receitaRacao.length > 0) {
-      // Fração por MS de cada ingrediente na receita → rateia o kgMS efetivo do
-      // slot (que já respeita msOverride). Σ das parcelas = kgMS do slot.
-      const parcelas = receitaRacao
-        .map(r => ({ ai: alimentos.find(x => x.nome === r.alimento_nome), kg_d: r.kg_d }))
-        .filter((p): p is { ai: Alimento; kg_d: number } => !!p.ai)
-        .map(p => ({ ai: p.ai, dm: p.kg_d * p.ai.ms }));
-      const somaDM = parcelas.reduce((s, p) => s + p.dm, 0);
-      if (somaDM > 0) {
-        for (const p of parcelas) {
-          const kgMS_i = (p.dm / somaDM) * kgMS;
-          const r = calcularRupRdpAlimento(p.ai, kgMS_i, kP_de(p.ai.tipo), rp);
-          kgRUP_f += r.rup;
-          kgRDP_f += r.rdp;
-          idRUP_f += r.idRup;
-        }
-      }
-    } else {
-      const r = calcularRupRdpAlimento(a, kgMS, kP_de(a.tipo), rp);
-      kgRUP_f = r.rup;
-      kgRDP_f = r.rdp;
-      idRUP_f = r.idRup;
+    for (const f of feedsEfetivosDoSlot(a, kgMS, alimentos)) {
+      const r = calcularRupRdpAlimento(f.a, f.kgMS, kP_de(f.a.tipo), rp);
+      kgRUP_f += r.rup;
+      kgRDP_f += r.rdp;
+      idRUP_f += r.idRup;
+      // NPN: Ureia e Cloreto de Amônio têm npn_frac=1.0; demais ~0
+      kgNPN_CP += (f.a.pb ?? 0) * (f.a.npn_frac ?? 0) * f.kgMS;
     }
 
     An_idRUPIn += idRUP_f;
@@ -474,8 +489,6 @@ export function calcularResultados(
     // FA verdadeiro: prefere a.fa (Fd_FA do NASEM CSV); fallback 80% do EE
     // (heurística NASEM Cap. 4 — a maior parte do EE não-FA é cera/glicerol)
     kgFA += (a.fa ?? ((a.ee ?? 0) * 0.80)) * kgMS;
-    // NPN: Ureia e Cloreto de Amônio têm npn_frac=1.0; demais ~0
-    kgNPN_CP += (a.pb ?? 0) * (a.npn_frac ?? 0) * kgMS;
     kgCNF += cnf * kgMS;
 
     const amido = a.amido ?? 0;
@@ -715,10 +728,14 @@ export function calcularResultados(
     for (const slot of slots) {
       if (!slot.alimentoNome || slot.kgMN <= 0) continue;
       const a = resolverAlimentoDoSlot(slot, alimentos);
-      if (!a || !a.fdn || a.fdn <= 0) continue;
+      if (!a) continue;
       const kgMS_slot = slot.kgMN * msEff(slot, a);
-      const Fd_dcNDF_base = calcularFdDcNDFBase(a, ndf_method);
-      Dt_DigNDFIn_Base_kg += Fd_dcNDF_base * a.fdn * kgMS_slot;
+      // Rações expandidas por ingrediente: dcNDF base (Van Soest/dFDN) é não-linear
+      // em lignina/FDN, então usar o composto médio divergiria dos insumos soltos.
+      for (const f of feedsEfetivosDoSlot(a, kgMS_slot, alimentos)) {
+        if (!f.a.fdn || f.a.fdn <= 0) continue;
+        Dt_DigNDFIn_Base_kg += calcularFdDcNDFBase(f.a, ndf_method) * f.a.fdn * f.kgMS;
+      }
     }
     const Dt_dcNDF_Base = kgFDN > 0 ? Dt_DigNDFIn_Base_kg / kgFDN : 0;
     const dmi_bw_frac   = totalKgMS / animal.peso;
@@ -735,10 +752,14 @@ export function calcularResultados(
     for (const slot of slots) {
       if (!slot.alimentoNome || slot.kgMN <= 0) continue;
       const a = resolverAlimentoDoSlot(slot, alimentos);
-      if (!a || !a.amido) continue;
+      if (!a) continue;
       const kgMS_slot = slot.kgMN * msEff(slot, a);
-      const dcSt = (a.dc_st ?? 92) / 100;     // fração; default 92% (sem dado)
-      Dt_DigStIn_Base += dcSt * a.amido * kgMS_slot;
+      // Rações expandidas: dc_st é per-feed, então somamos por ingrediente.
+      for (const f of feedsEfetivosDoSlot(a, kgMS_slot, alimentos)) {
+        if (!f.a.amido) continue;
+        const dcSt = (f.a.dc_st ?? 92) / 100;   // fração; default 92% (sem dado)
+        Dt_DigStIn_Base += dcSt * f.a.amido * f.kgMS;
+      }
     }
     const TT_dcSt_Base = kgAMIDO > 0 ? Dt_DigStIn_Base / kgAMIDO : 0;
     const TT_dcSt = Math.max(0,
@@ -753,19 +774,23 @@ export function calcularResultados(
       const a = resolverAlimentoDoSlot(slot, alimentos);
       if (!a) continue;
       const kgMS_slot = slot.kgMN * msEff(slot, a);
-      const fa_frac   = a.fa ?? ((a.ee ?? 0) * 0.80);
-      const kgFA_slot = fa_frac * kgMS_slot;
-      if (kgFA_slot <= 0) continue;
-      let dcFA: number;
-      if (a.dc_fa != null) {
-        dcFA = a.dc_fa / 100;
-      } else {
-        dcFA = 0.73;
-        const nm = a.nome.toLowerCase();
-        if (a.classificacao === 'Gordura/Óleo' && nm.includes('óleo de')) dcFA = 0.70;
-        else if (nm.includes('sabões de cálcio')) dcFA = 0.76;
+      // Rações expandidas: dc_fa é per-feed (ou heurística por classe/nome do
+      // insumo), então somamos por ingrediente.
+      for (const f of feedsEfetivosDoSlot(a, kgMS_slot, alimentos)) {
+        const fa_frac   = f.a.fa ?? ((f.a.ee ?? 0) * 0.80);
+        const kgFA_slot = fa_frac * f.kgMS;
+        if (kgFA_slot <= 0) continue;
+        let dcFA: number;
+        if (f.a.dc_fa != null) {
+          dcFA = f.a.dc_fa / 100;
+        } else {
+          dcFA = 0.73;
+          const nm = f.a.nome.toLowerCase();
+          if (f.a.classificacao === 'Gordura/Óleo' && nm.includes('óleo de')) dcFA = 0.70;
+          else if (nm.includes('sabões de cálcio')) dcFA = 0.76;
+        }
+        Dt_DigFAIn += dcFA * kgFA_slot;
       }
-      Dt_DigFAIn += dcFA * kgFA_slot;
     }
 
     // 4) CP digestion (Eq. 3-7b) — aparente
