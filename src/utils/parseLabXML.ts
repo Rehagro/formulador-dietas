@@ -138,10 +138,17 @@ export function parseLabXML(xmlContent: string): ParsedLabXML {
   // NDT (Milk 2006 TDN) — quando disponível
   const TDN_pct      = num(get('Milk2006_TDN'));     // %
 
-  // ── IVNDFD48 % NDF: usa cinética de 1ª ordem quando possível ───────────────
+  // ── IVNDFD48 % NDF: só quando há cinética de 1ª ordem confiável ────────────
   // pdNDF (% MS) = aNDF - uNDF240
   // dig_frac em 48h = 1 - exp(-Kd × 48 / 100)   (Kd em %/h)
   // IVNDFD48 % NDF = pdNDF × dig_frac / aNDF × 100
+  //
+  // ⚠️ NÃO usamos a digestibilidade de 30h como proxy do 48h: em silagem de milho
+  // o dFDN 30h fica ~10pp ABAIXO do 48h (ex.: laudo 3rLab dFDNt 30h=48,5 vs 48h=58,8),
+  // o que subestimava a energia em até ~1,1 L de leite. Quando o laudo não traz a
+  // cinética (uNDF240 + NDFkd), deixamos ivndfd48 = null: o motor cai na equação da
+  // lignina (Eq. 20-112, Van Soest) — o MESMO fallback do NASEM oficial — e avisamos
+  // o usuário a digitar o dFDN 48h medido (linha "dFDNt 48h %FDN" do laudo).
   let ivndfd48: number | null = null;
   if (aNDF != null && uNDF240 != null && NDFkd != null && aNDF > 0) {
     const pdNDF_frac = (aNDF - uNDF240) / aNDF;
@@ -149,11 +156,14 @@ export function parseLabXML(xmlContent: string): ParsedLabXML {
     ivndfd48         = Math.max(0, Math.min(100, pdNDF_frac * dig_frac * 100));
     camposCalculados.ivndfd48 = 'calculado do Kd cinético (uNDF240 + NDFkd)';
   } else if (NDFDom30h != null) {
-    ivndfd48 = NDFDom30h;
-    camposCalculados.ivndfd48 = 'aproximação NDFDom 30h (XML não traz cinética completa)';
-    warnings.push('IVNDFD48 aproximado via NDFDom 30h (≈ 1pp menor que 48h em forrageiras típicas).');
+    // Laudo tem digestibilidade in vitro mas sem cinética completa p/ chegar ao 48h.
+    warnings.push(
+      'Laudo trouxe dFDN in vitro (30h) mas não a cinética (uNDF240 + Kd) para estimar o 48h. ' +
+      'O dFDN 48h ficou em branco — o cálculo usa a equação da lignina (padrão NASEM). ' +
+      'Se o laudo informar "dFDNt 48h %FDN", digite-o na ficha para maior precisão.'
+    );
   }
-  // Senão: deixa null → template NASEM preenche
+  // Senão: deixa null → motor usa Eq. da lignina (NASEM Use_DNDF_IV=0)
 
   // ── Validações simples ────────────────────────────────────────────────────
   if (DM != null && (DM < 1 || DM > 100)) warnings.push(`MS ${DM}% fora de escala (1-100).`);
