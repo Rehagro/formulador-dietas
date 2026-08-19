@@ -1,0 +1,60 @@
+name: Keepalive Supabase
+
+# O plano free do Supabase pausa o projeto apos ~7 dias sem atividade. Quando
+# isso acontece o subdominio sai do DNS e o login em producao quebra para todos
+# os usuarios. Este job faz uma leitura minima no banco todo dia para manter o
+# projeto ativo. Se o ping falhar, o workflow falha de proposito e o GitHub
+# manda e-mail — serve tambem como monitoramento do backend.
+#
+# Requer os secrets SUPABASE_URL e SUPABASE_ANON_KEY (Settings > Secrets and
+# variables > Actions).
+#
+# Atencao: o GitHub desativa workflows agendados apos 60 dias sem nenhuma
+# atividade no repositorio. Se o projeto ficar parado esse tempo, e preciso
+# reativar o workflow na aba Actions.
+
+on:
+  schedule:
+    # Todo dia as 09:00 UTC (06:00 no horario de Brasilia). Diario e nao a cada
+    # 3 dias porque o agendador do GitHub atrasa ou pula execucoes em horarios
+    # de pico — assim varias falhas seguidas ainda ficam longe da janela de 7
+    # dias do Supabase.
+    - cron: '0 9 * * *'
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Ping no PostgREST (toca o banco)
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "${SUPABASE_URL:-}" ] || [ -z "${SUPABASE_ANON_KEY:-}" ]; then
+            echo "::error::Configure os secrets SUPABASE_URL e SUPABASE_ANON_KEY no repositorio."
+            exit 1
+          fi
+
+          # Consulta minima via PostgREST: exige o Postgres de pe, entao conta
+          # como atividade de banco. O /auth/v1/health nao toca o banco e por
+          # isso nao serve para este fim.
+          status=$(curl -sS --max-time 30 --retry 3 --retry-delay 10 --retry-all-errors \
+            -o resposta.txt -w '%{http_code}' \
+            -H "apikey: $SUPABASE_ANON_KEY" \
+            -H "Authorization: Bearer $SUPABASE_ANON_KEY" \
+            "$SUPABASE_URL/rest/v1/dietas?select=id&limit=1") || status=000
+
+          echo "HTTP $status"
+          echo "Resposta: $(head -c 300 resposta.txt)"
+
+          # 200 = ok. 401/403 tambem provam que o servidor respondeu (RLS
+          # barrando o anon), o que ja basta como atividade.
+          case "$status" in
+            200|401|403) echo "Projeto ativo." ;;
+            000) echo "::error::Sem resposta do servidor — projeto provavelmente pausado."; exit 1 ;;
+            *)   echo "::error::Resposta inesperada: HTTP $status"; exit 1 ;;
+          esac
