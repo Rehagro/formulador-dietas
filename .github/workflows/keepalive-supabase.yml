@@ -51,10 +51,14 @@ jobs:
           echo "HTTP $status"
           echo "Resposta: $(head -c 300 resposta.txt)"
 
-          # 200 = ok. 401/403 tambem provam que o servidor respondeu (RLS
-          # barrando o anon), o que ja basta como atividade.
+          # So 200 conta. Com a chave certa e o RLS barrando o anon, o
+          # PostgREST devolve 200 com lista vazia — conferido em 21/08/2026.
+          # Um 401/403 vem do gateway ANTES do Postgres (chave invalida ou
+          # expirada): o ping nao toca o banco e o projeto pausa do mesmo
+          # jeito, com o workflow verde. Por isso agora isso e falha.
           case "$status" in
-            200|401|403) echo "Projeto ativo." ;;
+            200) echo "Projeto ativo." ;;
+            401|403) echo "::error::HTTP $status — chave rejeitada no gateway, o ping NAO tocou o banco. Revise o secret SUPABASE_ANON_KEY."; exit 1 ;;
             000) echo "::error::Sem resposta do servidor — projeto provavelmente pausado."; exit 1 ;;
             *)   echo "::error::Resposta inesperada: HTTP $status"; exit 1 ;;
           esac
