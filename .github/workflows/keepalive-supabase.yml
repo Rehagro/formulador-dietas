@@ -2,12 +2,27 @@ name: Keepalive Supabase
 
 # O plano free do Supabase pausa o projeto apos ~7 dias sem atividade. Quando
 # isso acontece o subdominio sai do DNS e o login em producao quebra para todos
-# os usuarios. Este job faz uma leitura minima no banco todo dia para manter o
-# projeto ativo. Se o ping falhar, o workflow falha de proposito e o GitHub
-# manda e-mail — serve tambem como monitoramento do backend.
+# os usuarios, e so volta se alguem clicar em Restore no painel — nao volta
+# sozinho.
+#
+# HISTORICO (importante, nao repetir o erro):
+# A primeira versao deste workflow fazia um SELECT com a chave anon na tabela
+# `dietas`. Como o RLS e `auth.uid() = user_id` e o anon nao tem uid, o Postgres
+# filtrava tudo e o PostgREST devolvia 200 com lista vazia. Os runs #4 a #23
+# (22/08 a 10/09/2026) ficaram verdes 20 dias seguidos com esse 200 — e mesmo
+# assim o projeto pausou, pego pelo run #24 em 11/09/2026, exigindo Restore
+# manual no painel. Ou seja: aquele read vazio nao segurou o relogio de 7 dias.
+# Por isso agora o ping ESCREVE (UPDATE de um timestamp numa tabela dedicada),
+# que e atividade de banco inegavel.
+#
+# Isso ainda e uma HIPOTESE com um unico ponto de dado: o Supabase nao documenta
+# o criterio exato de atividade. Se o projeto pausar de novo mesmo com a escrita
+# diaria passando, o ping esta descartado como estrategia e a unica solucao
+# confiavel e o plano pago (projetos em plano pago nao pausam).
 #
 # Requer os secrets SUPABASE_URL e SUPABASE_ANON_KEY (Settings > Secrets and
-# variables > Actions).
+# variables > Actions) e a tabela `keepalive` criada pelo SQL em
+# docs/keepalive-setup.sql.
 #
 # Atencao: o GitHub desativa workflows agendados apos 60 dias sem nenhuma
 # atividade no repositorio. Se o projeto ficar parado esse tempo, e preciso
@@ -25,40 +40,100 @@ on:
 jobs:
   ping:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     steps:
-      - name: Ping no PostgREST (toca o banco)
+      - name: Escrita no PostgREST (atividade real de banco)
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
         run: |
-          set -euo pipefail
+          set -uo pipefail
 
           if [ -z "${SUPABASE_URL:-}" ] || [ -z "${SUPABASE_ANON_KEY:-}" ]; then
             echo "::error::Configure os secrets SUPABASE_URL e SUPABASE_ANON_KEY no repositorio."
             exit 1
           fi
 
-          # Consulta minima via PostgREST: exige o Postgres de pe, entao conta
-          # como atividade de banco. O /auth/v1/health nao toca o banco e por
-          # isso nao serve para este fim.
-          status=$(curl -sS --max-time 30 --retry 3 --retry-delay 10 --retry-all-errors \
-            -o resposta.txt -w '%{http_code}' \
-            -H "apikey: $SUPABASE_ANON_KEY" \
-            -H "Authorization: Bearer $SUPABASE_ANON_KEY" \
-            "$SUPABASE_URL/rest/v1/dietas?select=id&limit=1") || status=000
+          # Quatro tentativas espacadas em 60s. O retry antigo era ~30s no total
+          # e nao distinguia um blip de DNS de uma pausa real; com ~3 minutos de
+          # janela, uma instabilidade passageira nao gera alarme falso, e uma
+          # pausa de verdade (que dura ate o Restore manual) continua falhando.
+          tentativas=4
+          espera=60
+          rc=0
+          status=000
 
-          echo "HTTP $status"
-          echo "Resposta: $(head -c 300 resposta.txt)"
+          for n in $(seq 1 "$tentativas"); do
+            if status=$(curl -sS --max-time 30 \
+                 -X PATCH \
+                 -o resposta.txt -w '%{http_code}' \
+                 -H "apikey: $SUPABASE_ANON_KEY" \
+                 -H "Authorization: Bearer $SUPABASE_ANON_KEY" \
+                 -H "Content-Type: application/json" \
+                 -H "Prefer: return=representation" \
+                 -d "{\"ultimo_ping\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\",\"origem\":\"github-actions\"}" \
+                 "$SUPABASE_URL/rest/v1/keepalive?id=eq.1"); then
+              rc=0
+            else
+              rc=$?
+              status=000
+            fi
 
-          # So 200 conta. Com a chave certa e o RLS barrando o anon, o
-          # PostgREST devolve 200 com lista vazia — conferido em 21/08/2026.
-          # Um 401/403 vem do gateway ANTES do Postgres (chave invalida ou
-          # expirada): o ping nao toca o banco e o projeto pausa do mesmo
-          # jeito, com o workflow verde. Por isso agora isso e falha.
-          case "$status" in
-            200) echo "Projeto ativo." ;;
-            401|403) echo "::error::HTTP $status — chave rejeitada no gateway, o ping NAO tocou o banco. Revise o secret SUPABASE_ANON_KEY."; exit 1 ;;
-            000) echo "::error::Sem resposta do servidor — projeto provavelmente pausado."; exit 1 ;;
-            *)   echo "::error::Resposta inesperada: HTTP $status"; exit 1 ;;
+            echo "Tentativa $n/$tentativas: HTTP $status (curl rc=$rc)"
+
+            case "$status" in
+              200)
+                corpo=$(head -c 300 resposta.txt)
+                echo "Resposta: $corpo"
+                # Com Prefer: return=representation, um UPDATE que casou devolve
+                # a linha. Se vier `[]`, o request chegou ao Postgres mas nao
+                # atualizou nada (linha id=1 faltando ou RLS barrando o UPDATE)
+                # — ou seja, nao houve escrita, e e exatamente o buraco que
+                # derrubou a versao anterior deste workflow.
+                if [ "$corpo" = "[]" ]; then
+                  echo "::error::UPDATE nao atingiu nenhuma linha. Rode docs/keepalive-setup.sql no SQL Editor do Supabase (tabela keepalive, linha id=1 e policy de UPDATE para anon)."
+                  exit 1
+                fi
+                echo "Projeto ativo e escrita confirmada."
+                exit 0
+                ;;
+              401|403)
+                echo "Resposta: $(head -c 300 resposta.txt)"
+                echo "::error::HTTP $status — request barrado no gateway/RLS, o ping NAO escreveu no banco. Revise o secret SUPABASE_ANON_KEY e a policy de UPDATE em docs/keepalive-setup.sql."
+                exit 1
+                ;;
+              404)
+                echo "Resposta: $(head -c 300 resposta.txt)"
+                echo "::error::HTTP 404 — tabela keepalive nao existe. Rode docs/keepalive-setup.sql no SQL Editor do Supabase."
+                exit 1
+                ;;
+            esac
+
+            if [ "$n" -lt "$tentativas" ]; then
+              sleep "$espera"
+            fi
+          done
+
+          echo "Ultima resposta: $(head -c 300 resposta.txt 2>/dev/null)"
+
+          # Diagnostico honesto por tipo de falha. A versao anterior chutava
+          # "projeto provavelmente pausado" para qualquer HTTP 000, o que
+          # tambem cobre DNS que piscou, conexao recusada e timeout.
+          case "$rc" in
+            6)
+              echo "::error::DNS nao resolve o host do Supabase apos $tentativas tentativas em ~$(( (tentativas - 1) * espera ))s. O Supabase tira o subdominio do ar quando PAUSA o projeto, e ele so volta com Restore manual: abra https://supabase.com/dashboard e verifique."
+              ;;
+            7)
+              echo "::error::Conexao recusada apos $tentativas tentativas — o DNS resolve mas nada atende. Provavel instabilidade do Supabase ou projeto reiniciando."
+              ;;
+            28)
+              echo "::error::Timeout apos $tentativas tentativas — servidor no ar mas sem responder dentro de 30s."
+              ;;
+            0)
+              echo "::error::Resposta inesperada: HTTP $status."
+              ;;
+            *)
+              echo "::error::Falha do curl (rc=$rc), HTTP $status."
+              ;;
           esac
+          exit 1
