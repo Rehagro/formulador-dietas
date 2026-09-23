@@ -106,8 +106,8 @@ export default function PainelAnimal({ animal, onChange }: Props) {
         <Campo label="Gordura"    hint="%"    value={animal.gordura}  min={1}   max={8}   step={0.1}  onChange={set('gordura')}
           dica="% de gordura do leite. Impacta o leite potencial pela energia." />
         <Campo label="Proteína (PB)" hint="%" value={animal.proteina} min={1}   max={6}   step={0.1}  onChange={set('proteina')}
-          dica={"Proteína Bruta (PB) do leite (%), como vem no laudo. O sistema converte para " +
-                "proteína verdadeira automaticamente — não precisa multiplicar nada. " +
+          dica={"Proteína do leite (%). Digite o valor que aparece no laudo de análise do leite " +
+                "(boletim do laticínio) — é a proteína bruta. Use direto, sem converter nem ajustar. " +
                 "Impacta o leite potencial pela proteína e a energia."} />
         <Campo label="Lactose"    hint="%"    value={animal.lactose}  min={1}   max={6}   step={0.1}  onChange={set('lactose')}
           dica="Lactose do leite (%). Normal: 4,6–4,8%. Impacta o leite potencial pela energia." />

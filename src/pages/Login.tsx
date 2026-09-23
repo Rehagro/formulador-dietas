@@ -2,6 +2,28 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { signIn } from '../lib/supabase';
 
+// Traduz o erro do Supabase Auth. Sem isso, uma queda do backend (projeto
+// pausado, rede fora) aparecia para o usuario como "senha incorreta".
+function mensagemErro(error: { message?: string; name?: string; status?: number }) {
+  const msg = error.message ?? '';
+
+  // Falha de rede: o supabase-js devolve AuthRetryableFetchError com status 0
+  // quando nao consegue nem alcancar o servidor.
+  if (error.name === 'AuthRetryableFetchError' || error.status === 0 || /fetch/i.test(msg)) {
+    return 'Nao foi possivel conectar ao servidor. Aguarde alguns minutos e tente de novo — sua senha esta correta.';
+  }
+  if (error.status === 429 || /rate limit/i.test(msg)) {
+    return 'Muitas tentativas seguidas. Aguarde um minuto e tente novamente.';
+  }
+  if (/email not confirmed/i.test(msg)) {
+    return 'E-mail ainda nao confirmado. Verifique sua caixa de entrada.';
+  }
+  if (/invalid login credentials/i.test(msg)) {
+    return 'E-mail ou senha incorretos.';
+  }
+  return `Nao foi possivel entrar: ${msg || 'erro desconhecido'}`;
+}
+
 export default function Login() {
   const navigate = useNavigate();
   const [email, setEmail] = useState('');
@@ -16,11 +38,13 @@ export default function Login() {
     try {
       const { error } = await signIn(email, senha);
       if (error) {
-        setErro('E-mail ou senha incorretos.');
+        console.error('[login] falha na autenticacao:', error);
+        setErro(mensagemErro(error));
       } else {
         navigate('/');
       }
-    } catch {
+    } catch (e) {
+      console.error('[login] excecao:', e);
       setErro('Erro ao conectar. Tente novamente.');
     } finally {
       setCarregando(false);
