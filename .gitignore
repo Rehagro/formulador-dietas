@@ -10,3 +10,5 @@ Bookshelf_NBK600603.pdf
 *.docx
 *.xlsx
 Guia-*.html
+# Config local do Claude Code (permissoes por maquina, nao compartilhavel)
+.claude/settings.local.json
